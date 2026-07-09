@@ -69,37 +69,43 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
 }
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
-  head: () => ({
-    meta: [
-      { charSet: "utf-8" },
-      { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Fyora — Get paid from anywhere, land anywhere" },
-      {
-        name: "description",
-        content:
-          "Fyora is the creator money page for chain-abstracted payments. Share one link, get paid from any chain, receive on your favorite one.",
-      },
-      { name: "author", content: "Fyora" },
-      { property: "og:title", content: "Fyora — Get paid from anywhere" },
-      { property: "og:description", content: "One link. Any chain. Instant support for creators." },
-      { property: "og:type", content: "website" },
-      { property: "og:image", content: "/api/public/og/fyora" },
-      { property: "og:image:width", content: "1200" },
-      { property: "og:image:height", content: "630" },
-      { name: "twitter:card", content: "summary_large_image" },
-      { name: "twitter:image", content: "/api/public/og/fyora" },
-    ],
-    links: [
-      { rel: "stylesheet", href: appCss },
-      { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
-      { rel: "preconnect", href: "https://fonts.googleapis.com" },
-      { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
-      {
-        rel: "stylesheet",
-        href: "https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Fraunces:ital,opsz,wght@0,9..144,600;0,9..144,700;1,9..144,600;1,9..144,700&family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Archivo+Black&display=swap",
-      },
-    ],
-  }),
+  head: () => {
+    const baseUrl = typeof window !== "undefined" ? window.location.origin : "https://fyora.app";
+    return {
+      meta: [
+        { charSet: "utf-8" },
+        { name: "viewport", content: "width=device-width, initial-scale=1" },
+        { title: "Fyora — Get paid from anywhere, land anywhere" },
+        {
+          name: "description",
+          content:
+            "Fyora is the creator money page for chain-abstracted payments. Share one link, get paid from any chain, receive on your favorite one.",
+        },
+        { name: "author", content: "Fyora" },
+        { property: "og:title", content: "Fyora — Get paid from anywhere" },
+        {
+          property: "og:description",
+          content: "One link. Any chain. Instant support for creators.",
+        },
+        { property: "og:type", content: "website" },
+        { property: "og:image", content: `${baseUrl}/api/public/og/fyora` },
+        { property: "og:image:width", content: "1200" },
+        { property: "og:image:height", content: "630" },
+        { name: "twitter:card", content: "summary_large_image" },
+        { name: "twitter:image", content: `${baseUrl}/api/public/og/fyora` },
+      ],
+      links: [
+        { rel: "stylesheet", href: appCss },
+        { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
+        { rel: "preconnect", href: "https://fonts.googleapis.com" },
+        { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
+        {
+          rel: "stylesheet",
+          href: "https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Fraunces:ital,opsz,wght@0,9..144,600;0,9..144,700;1,9..144,600;1,9..144,700&family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Archivo+Black&display=swap",
+        },
+      ],
+    };
+  },
   shellComponent: RootShell,
   component: RootComponent,
   notFoundComponent: NotFoundComponent,

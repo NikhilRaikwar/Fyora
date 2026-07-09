@@ -16,7 +16,8 @@ import { HandleUrl } from "@/components/kivo/Logo";
 
 export const Route = createFileRoute("/$handle")({
   head: ({ params }) => {
-    const ogImage = `/api/public/og/${params.handle}`;
+    const baseUrl = typeof window !== "undefined" ? window.location.origin : "https://fyora.app";
+    const ogImage = `${baseUrl}/api/public/og/${params.handle}`;
     return {
       meta: [
         { title: `Support @${params.handle} on Fyora` },
@@ -26,7 +27,7 @@ export const Route = createFileRoute("/$handle")({
           property: "og:description",
           content: `Send a tip from any chain. Lands where they want.`,
         },
-        { property: "og:url", content: `/${params.handle}` },
+        { property: "og:url", content: `${baseUrl}/${params.handle}` },
         { property: "og:type", content: "profile" },
         { property: "og:image", content: ogImage },
         { property: "og:image:width", content: "1200" },
@@ -34,7 +35,7 @@ export const Route = createFileRoute("/$handle")({
         { name: "twitter:card", content: "summary_large_image" },
         { name: "twitter:image", content: ogImage },
       ],
-      links: [{ rel: "canonical", href: `/${params.handle}` }],
+      links: [{ rel: "canonical", href: `${baseUrl}/${params.handle}` }],
     };
   },
   component: Public,
