@@ -1,5 +1,6 @@
 import { cn } from "@/lib/utils";
 import { motion } from "motion/react";
+import type { ElementType } from "react";
 
 export function EmojiAvatar({
   emoji,
@@ -14,7 +15,7 @@ export function EmojiAvatar({
   className?: string;
   animate?: boolean;
 }) {
-  const Comp: any = animate ? motion.div : "div";
+  const Comp = (animate ? motion.div : "div") as ElementType;
   return (
     <Comp
       {...(animate && {

@@ -16,7 +16,7 @@ import { toast } from "sonner";
 
 export function Header() {
   const hydrated = useHydrated();
-  const current = useKivo((s) => s.currentHandle ? s.creators[s.currentHandle] : undefined);
+  const current = useKivo((s) => (s.currentHandle ? s.creators[s.currentHandle] : undefined));
   const disconnect = useKivo((s) => s.disconnect);
   const navigate = useNavigate();
 

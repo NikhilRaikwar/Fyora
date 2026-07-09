@@ -134,7 +134,6 @@ export function PaymentSheet({
         </div>
 
         <div className="p-4 sm:p-6 min-h-[380px]">
-
           <AnimatePresence mode="wait">
             {step === "confirm" && (
               <StepWrap key="confirm">
@@ -175,9 +174,7 @@ export function PaymentSheet({
                 <div className="space-y-4">
                   <div>
                     <h3 className="font-display italic text-2xl">Sign in to pay</h3>
-                    <p className="text-sm text-muted-foreground">
-                      One click. No app to install.
-                    </p>
+                    <p className="text-sm text-muted-foreground">One click. No app to install.</p>
                   </div>
 
                   <div className="rounded-2xl chunky bg-lilac/30 p-4">
@@ -250,7 +247,9 @@ export function PaymentSheet({
                       across {BALANCES.length} chains — spend it anywhere
                     </div>
                     <div className="absolute -right-4 -top-4 rotate-12">
-                      <Sticker color="ink" rotate={12}>Universal</Sticker>
+                      <Sticker color="ink" rotate={12}>
+                        Universal
+                      </Sticker>
                     </div>
                   </div>
 

@@ -14,7 +14,11 @@ export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
       { title: "Fyora — Get paid from anywhere, land anywhere" },
-      { name: "description", content: "Fyora is the playful creator money page for chain-abstracted payments. One link. Any chain. Instant support." },
+      {
+        name: "description",
+        content:
+          "Fyora is the playful creator money page for chain-abstracted payments. One link. Any chain. Instant support.",
+      },
       { property: "og:title", content: "Fyora — Get paid from anywhere" },
       { property: "og:description", content: "One link. Any chain. Instant support for creators." },
     ],
@@ -25,7 +29,10 @@ export const Route = createFileRoute("/")({
 function Landing() {
   const [handle, setHandle] = useState("");
   const navigate = useNavigate();
-  const clean = handle.trim().toLowerCase().replace(/[^a-z0-9_]/g, "");
+  const clean = handle
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_]/g, "");
 
   return (
     <div className="min-h-screen bg-paper text-ink">
@@ -44,29 +51,43 @@ function Landing() {
             Get paid from{" "}
             <span className="italic relative inline-block">
               anywhere
-              <svg className="absolute -bottom-2 left-0 w-full" viewBox="0 0 200 12" preserveAspectRatio="none">
-                <path d="M2 8 Q 50 -2 100 6 T 198 6" stroke="#C6F24E" strokeWidth="8" fill="none" strokeLinecap="round" />
+              <svg
+                className="absolute -bottom-2 left-0 w-full"
+                viewBox="0 0 200 12"
+                preserveAspectRatio="none"
+              >
+                <path
+                  d="M2 8 Q 50 -2 100 6 T 198 6"
+                  stroke="#C6F24E"
+                  strokeWidth="8"
+                  fill="none"
+                  strokeLinecap="round"
+                />
               </svg>
             </span>
-            ,<br className="hidden sm:block" /> land <span className="italic">wherever</span> you like.
+            ,<br className="hidden sm:block" /> land <span className="italic">wherever</span> you
+            like.
           </h1>
           <p className="mt-6 text-lg text-muted-foreground max-w-xl mx-auto">
-            One link. Any chain. Your supporters pay in a tap — you receive on the
-            chain you love.
+            One link. Any chain. Your supporters pay in a tap — you receive on the chain you love.
           </p>
 
           {/* handle claim */}
           <form
             onSubmit={(e) => {
               e.preventDefault();
-              if (clean) navigate({ to: "/onboard", search: { h: clean } as any });
+              if (clean)
+                navigate({ to: "/onboard", search: { h: clean } as Record<string, string> });
               else navigate({ to: "/onboard" });
             }}
             className="mt-10 mx-auto max-w-lg"
           >
             <div className="flex items-center gap-0 bg-card chunky-thick shadow-sticker-lg rounded-full pl-5 pr-1.5 py-1.5">
-              <span className="text-muted-foreground font-mono text-sm sm:text-base whitespace-nowrap">
-                fyora.app/
+              <span
+                className="text-ink text-sm sm:text-base whitespace-nowrap"
+                style={{ fontFamily: '"Archivo Black", sans-serif', letterSpacing: "-0.03em" }}
+              >
+                fyora<span style={{ color: "var(--coral)" }}>.</span>app/
               </span>
               <input
                 autoFocus
@@ -115,8 +136,9 @@ function Landing() {
       {/* HOW IT WORKS */}
       <section className="mx-auto max-w-6xl px-4 sm:px-6 py-16 sm:py-24">
         <div className="text-center mb-10 sm:mb-14">
-
-          <Sticker color="lilac" rotate={2}>How it works</Sticker>
+          <Sticker color="lilac" rotate={2}>
+            How it works
+          </Sticker>
           <h2 className="font-display text-4xl sm:text-5xl md:text-6xl italic mt-4">
             Three taps. No chain-picker in sight.
           </h2>
@@ -153,7 +175,9 @@ function Landing() {
               transition={{ delay: i * 0.1, type: "spring", stiffness: 120, damping: 16 }}
               className="rounded-3xl chunky-thick shadow-sticker-lg bg-card p-6 relative"
             >
-              <div className={`w-14 h-14 rounded-2xl ${s.color} chunky shadow-sticker-sm flex items-center justify-center mb-4`}>
+              <div
+                className={`w-14 h-14 rounded-2xl ${s.color} chunky shadow-sticker-sm flex items-center justify-center mb-4`}
+              >
                 {s.icon}
               </div>
               <div className="font-mono text-xs text-muted-foreground">{s.n}</div>
@@ -169,9 +193,12 @@ function Landing() {
         <div className="mx-auto max-w-5xl px-4 sm:px-6">
           <div className="flex items-end justify-between flex-wrap gap-4 mb-8 sm:mb-10">
             <div>
-              <Sticker color="lime" rotate={-3}>Explore</Sticker>
-              <h2 className="font-display text-4xl sm:text-5xl italic mt-3">Peek at real Fyora pages</h2>
-
+              <Sticker color="lime" rotate={-3}>
+                Explore
+              </Sticker>
+              <h2 className="font-display text-4xl sm:text-5xl italic mt-3">
+                Peek at real Fyora pages
+              </h2>
             </div>
             <Link
               to="/explore"
@@ -201,7 +228,8 @@ function Landing() {
       {/* CTA */}
       <section className="mx-auto max-w-4xl px-4 sm:px-6 py-16 sm:py-24 text-center">
         <h2 className="font-display text-4xl sm:text-6xl md:text-7xl italic leading-[1.05]">
-          Your money page,<br /> ready in <span className="bg-lime px-3 rounded-2xl inline-block">60 seconds</span>.
+          Your money page,
+          <br /> ready in <span className="bg-lime px-3 rounded-2xl inline-block">60 seconds</span>.
         </h2>
         <Link
           to="/onboard"
@@ -210,7 +238,6 @@ function Landing() {
           Make my Fyora →
         </Link>
       </section>
-
 
       <footer className="border-t-2 border-ink py-8 text-center text-sm text-muted-foreground">
         Made with 💚 · Fyora · Powered by Particle Universal Accounts

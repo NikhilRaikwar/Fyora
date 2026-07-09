@@ -29,7 +29,26 @@ export const Route = createFileRoute("/onboard")({
   component: Onboard,
 });
 
-const EMOJIS = ["🦊", "🐨", "🐳", "🦁", "🐸", "🌻", "🚀", "✨", "🐧", "🌊", "🌟", "🎨", "🎧", "🌙", "🌸", "🦖", "📚", "☕"];
+const EMOJIS = [
+  "🦊",
+  "🐨",
+  "🐳",
+  "🦁",
+  "🐸",
+  "🌻",
+  "🚀",
+  "✨",
+  "🐧",
+  "🌊",
+  "🌟",
+  "🎨",
+  "🎧",
+  "🌙",
+  "🌸",
+  "🦖",
+  "📚",
+  "☕",
+];
 const GRADIENTS: [string, string][] = [
   ["#C6F24E", "#B8A6FF"],
   ["#FF6B4A", "#FFD166"],
@@ -57,7 +76,10 @@ function Onboard() {
   const [token, setToken] = useState("usdc");
   const [address, setAddress] = useState("");
 
-  const cleanHandle = handle.trim().toLowerCase().replace(/[^a-z0-9_]/g, "");
+  const cleanHandle = handle
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_]/g, "");
   const taken = !!creators[cleanHandle];
   const available = cleanHandle.length >= 2 && !taken;
 
@@ -106,7 +128,9 @@ function Onboard() {
               >
                 {i < step ? <Check className="w-4 h-4" strokeWidth={3} /> : i + 1}
               </div>
-              <span className={`text-xs font-semibold hidden sm:inline ${i === step ? "" : "text-muted-foreground"}`}>
+              <span
+                className={`text-xs font-semibold hidden sm:inline ${i === step ? "" : "text-muted-foreground"}`}
+              >
                 {label}
               </span>
               {i < 3 && <div className="flex-1 h-0.5 bg-ink/30" />}
@@ -259,8 +283,12 @@ function Onboard() {
             {step === 2 && (
               <StepBox key="2">
                 <Sticker color="lilac">Step 3</Sticker>
-                <h2 className="font-display italic text-4xl sm:text-5xl mt-3">Where do funds land?</h2>
-                <p className="text-muted-foreground mt-1">Your favorite chain and token. You can change it anytime.</p>
+                <h2 className="font-display italic text-4xl sm:text-5xl mt-3">
+                  Where do funds land?
+                </h2>
+                <p className="text-muted-foreground mt-1">
+                  Your favorite chain and token. You can change it anytime.
+                </p>
 
                 <div className="mt-6">
                   <div className="text-xs uppercase font-bold tracking-wider text-muted-foreground mb-2">
@@ -275,7 +303,10 @@ function Onboard() {
                         className={`relative rounded-2xl chunky p-3 text-left press ${chain === c.id ? "bg-lime shadow-sticker" : "bg-card shadow-sticker-sm"}`}
                       >
                         <div className="flex items-center gap-2">
-                          <div className="w-6 h-6 rounded-full border border-ink" style={{ background: c.color }} />
+                          <div
+                            className="w-6 h-6 rounded-full border border-ink"
+                            style={{ background: c.color }}
+                          />
                           <div className="font-semibold text-sm">{c.name}</div>
                         </div>
                         {c.id === "arbitrum" && (
@@ -340,13 +371,22 @@ function Onboard() {
                   >
                     <EmojiAvatar emoji={emoji} gradient={gradient} size={100} />
                   </motion.div>
-                  <Sticker color="lime" rotate={-4} className="mt-4">You're live</Sticker>
-                  <h2 className="font-display italic text-4xl sm:text-5xl mt-3">Welcome, {name.split(" ")[0]}!</h2>
+                  <Sticker color="lime" rotate={-4} className="mt-4">
+                    You're live
+                  </Sticker>
+                  <h2 className="font-display italic text-4xl sm:text-5xl mt-3">
+                    Welcome, {name.split(" ")[0]}!
+                  </h2>
                   <p className="text-muted-foreground mt-1">Share your page anywhere.</p>
 
                   <div className="mt-6 mx-auto max-w-sm rounded-2xl bg-secondary chunky p-4 flex items-center gap-4">
                     <div className="bg-card p-2 rounded-xl chunky shadow-sticker-sm">
-                      <QRCodeSVG value={`https://fyora.app/${cleanHandle}`} size={80} bgColor="#ffffff" fgColor="#141313" />
+                      <QRCodeSVG
+                        value={`https://fyora.app/${cleanHandle}`}
+                        size={80}
+                        bgColor="#ffffff"
+                        fgColor="#141313"
+                      />
                     </div>
                     <div className="flex-1 min-w-0 text-left">
                       <div className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground">

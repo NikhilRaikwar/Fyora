@@ -15,14 +15,28 @@ import { Github, Globe, Youtube, Instagram, ArrowRight, Heart } from "lucide-rea
 import { HandleUrl } from "@/components/kivo/Logo";
 
 export const Route = createFileRoute("/$handle")({
-  head: ({ params }) => ({
-    meta: [
-      { title: `Support @${params.handle} on Fyora` },
-      { name: "description", content: `Send a tip to @${params.handle} from any chain.` },
-      { property: "og:title", content: `Support @${params.handle} on Fyora` },
-      { property: "og:description", content: `Send a tip from any chain. Lands where they want.` },
-    ],
-  }),
+  head: ({ params }) => {
+    const ogImage = `/api/public/og/${params.handle}`;
+    return {
+      meta: [
+        { title: `Support @${params.handle} on Fyora` },
+        { name: "description", content: `Send a tip to @${params.handle} from any chain.` },
+        { property: "og:title", content: `Support @${params.handle} on Fyora` },
+        {
+          property: "og:description",
+          content: `Send a tip from any chain. Lands where they want.`,
+        },
+        { property: "og:url", content: `/${params.handle}` },
+        { property: "og:type", content: "profile" },
+        { property: "og:image", content: ogImage },
+        { property: "og:image:width", content: "1200" },
+        { property: "og:image:height", content: "630" },
+        { name: "twitter:card", content: "summary_large_image" },
+        { name: "twitter:image", content: ogImage },
+      ],
+      links: [{ rel: "canonical", href: `/${params.handle}` }],
+    };
+  },
   component: Public,
 });
 
@@ -76,7 +90,7 @@ function Public() {
           </p>
           <Link
             to="/onboard"
-            search={{ h: handle } as any}
+            search={{ h: handle } as Record<string, string>}
             className="mt-6 inline-block rounded-full bg-lime text-ink chunky shadow-sticker px-6 py-3 font-semibold press"
           >
             Claim this handle →
@@ -95,7 +109,12 @@ function Public() {
 
       {/* Hero card */}
       <section className="relative">
-        <div className="absolute inset-0" style={{ background: `linear-gradient(135deg, ${creator.gradient[0]}44, ${creator.gradient[1]}44)` }} />
+        <div
+          className="absolute inset-0"
+          style={{
+            background: `linear-gradient(135deg, ${creator.gradient[0]}44, ${creator.gradient[1]}44)`,
+          }}
+        />
         <div className="relative mx-auto max-w-2xl px-4 sm:px-6 pt-12 pb-8">
           <motion.div
             initial={{ opacity: 0, y: 12 }}
@@ -106,7 +125,9 @@ function Public() {
               <EmojiAvatar emoji={creator.emoji} gradient={creator.gradient} size={96} animate />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <h1 className="font-display italic text-4xl sm:text-5xl leading-none break-words">{creator.name}</h1>
+                  <h1 className="font-display italic text-4xl sm:text-5xl leading-none break-words">
+                    {creator.name}
+                  </h1>
                 </div>
 
                 <div className="mt-1">
@@ -156,16 +177,13 @@ function Public() {
                   setCustom("");
                 }}
                 className={`rounded-2xl chunky py-3 sm:py-4 font-display italic text-2xl sm:text-3xl press ${
-                  amount === a && !custom
-                    ? "bg-lime shadow-sticker"
-                    : "bg-card shadow-sticker-sm"
+                  amount === a && !custom ? "bg-lime shadow-sticker" : "bg-card shadow-sticker-sm"
                 }`}
               >
                 ${a}
               </motion.button>
             ))}
           </div>
-
 
           <div className="mt-3 flex items-center gap-2 bg-secondary chunky rounded-2xl px-4 py-3">
             <span className="text-muted-foreground text-lg">$</span>
@@ -191,7 +209,10 @@ function Public() {
             onClick={() => setOpen(true)}
             className="mt-4 w-full rounded-full bg-ink text-paper py-4 sm:py-5 text-base sm:text-xl font-semibold chunky-thick shadow-sticker-lg press inline-flex items-center justify-center gap-2"
           >
-            <Heart className="w-5 h-5 shrink-0" /> <span className="truncate">Support {creator.name.split(" ")[0]} · ${finalAmount}</span>
+            <Heart className="w-5 h-5 shrink-0" />{" "}
+            <span className="truncate">
+              Support {creator.name.split(" ")[0]} · ${finalAmount}
+            </span>
           </motion.button>
 
           <div className="mt-2 text-center text-xs text-muted-foreground">
@@ -217,7 +238,6 @@ function Public() {
               <Odometer value={creator.payments.length} />
             </div>
           </div>
-
         </div>
       </section>
 

@@ -14,8 +14,14 @@ export function Odometer({
   className?: string;
 }) {
   const mv = useMotionValue(0);
-  const rounded = useTransform(mv, (v) =>
-    prefix + v.toLocaleString(undefined, { minimumFractionDigits: decimals, maximumFractionDigits: decimals }),
+  const rounded = useTransform(
+    mv,
+    (v) =>
+      prefix +
+      v.toLocaleString(undefined, {
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals,
+      }),
   );
   useEffect(() => {
     const controls = animate(mv, value, { duration: 1.2, ease: [0.22, 1, 0.36, 1] });

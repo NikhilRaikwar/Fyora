@@ -23,8 +23,7 @@ export const useKivo = create<State>()(
       currentHandle: "nikhil",
       hydrated: false,
       setCurrent: (handle) => set({ currentHandle: handle }),
-      upsertCreator: (c) =>
-        set((s) => ({ creators: { ...s.creators, [c.handle]: c } })),
+      upsertCreator: (c) => set((s) => ({ creators: { ...s.creators, [c.handle]: c } })),
       addPayment: (handle, p) =>
         set((s) => {
           const c = s.creators[handle];

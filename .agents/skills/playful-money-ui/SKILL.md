@@ -34,13 +34,13 @@ A concrete, opinionated design system. Follow it end-to-end — the aesthetic co
 :root {
   --radius: 1rem;
 
-  --paper: oklch(0.972 0.02 90);   /* #FBF7EE-ish warm off-white */
-  --ink:   oklch(0.18 0.01 60);    /* near-black warm */
-  --lime:  oklch(0.92 0.19 122);   /* signature #C6F24E */
-  --coral: oklch(0.72 0.19 30);    /* #FF6B4A */
-  --lilac: oklch(0.78 0.11 300);   /* #B8A6FF */
-  --sky:   oklch(0.85 0.08 230);
-  --butter:oklch(0.93 0.11 90);
+  --paper: oklch(0.972 0.02 90); /* #FBF7EE-ish warm off-white */
+  --ink: oklch(0.18 0.01 60); /* near-black warm */
+  --lime: oklch(0.92 0.19 122); /* signature #C6F24E */
+  --coral: oklch(0.72 0.19 30); /* #FF6B4A */
+  --lilac: oklch(0.78 0.11 300); /* #B8A6FF */
+  --sky: oklch(0.85 0.08 230);
+  --butter: oklch(0.93 0.11 90);
 
   --background: var(--paper);
   --foreground: var(--ink);
@@ -59,24 +59,49 @@ Load fonts via `<link>` in the root route head — never `@import` a remote font
 
 ```html
 <link rel="preconnect" href="https://fonts.googleapis.com" />
-<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link
+  href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:wght@400;500;600;700&display=swap"
+  rel="stylesheet"
+/>
 ```
 
 ## Signature utilities
 
 ```css
-@utility chunky       { border: 2px solid var(--ink); }
-@utility chunky-thick { border: 3px solid var(--ink); }
-@utility shadow-sticker    { box-shadow: 4px 4px 0 0 var(--ink); }
-@utility shadow-sticker-sm { box-shadow: 2px 2px 0 0 var(--ink); }
-@utility shadow-sticker-lg { box-shadow: 6px 6px 0 0 var(--ink); }
+@utility chunky {
+  border: 2px solid var(--ink);
+}
+@utility chunky-thick {
+  border: 3px solid var(--ink);
+}
+@utility shadow-sticker {
+  box-shadow: 4px 4px 0 0 var(--ink);
+}
+@utility shadow-sticker-sm {
+  box-shadow: 2px 2px 0 0 var(--ink);
+}
+@utility shadow-sticker-lg {
+  box-shadow: 6px 6px 0 0 var(--ink);
+}
 @utility press {
-  transition: transform 120ms ease, box-shadow 120ms ease;
-  &:hover  { transform: translate(-1px,-1px); box-shadow: 5px 5px 0 0 var(--ink); }
-  &:active { transform: translate(2px,2px);  box-shadow: 2px 2px 0 0 var(--ink); }
+  transition:
+    transform 120ms ease,
+    box-shadow 120ms ease;
+  &:hover {
+    transform: translate(-1px, -1px);
+    box-shadow: 5px 5px 0 0 var(--ink);
+  }
+  &:active {
+    transform: translate(2px, 2px);
+    box-shadow: 2px 2px 0 0 var(--ink);
+  }
 }
 @utility grid-paper {
-  background-image: radial-gradient(circle at 1px 1px, oklch(0.18 0.01 60 / 0.08) 1px, transparent 0);
+  background-image: radial-gradient(
+    circle at 1px 1px,
+    oklch(0.18 0.01 60 / 0.08) 1px,
+    transparent 0
+  );
   background-size: 24px 24px;
 }
 ```

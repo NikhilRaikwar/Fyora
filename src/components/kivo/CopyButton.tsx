@@ -17,7 +17,9 @@ export function CopyButton({
       onClick={async () => {
         try {
           await navigator.clipboard.writeText(value);
-        } catch {}
+        } catch {
+          // ignore
+        }
         setCopied(true);
         toast.success("Copied to clipboard");
         setTimeout(() => setCopied(false), 1500);

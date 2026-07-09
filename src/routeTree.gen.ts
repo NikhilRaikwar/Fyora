@@ -16,6 +16,7 @@ import { Route as HandleRouteImport } from './routes/$handle'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as DashboardIndexRouteImport } from './routes/dashboard.index'
 import { Route as DashboardEditRouteImport } from './routes/dashboard.edit'
+import { Route as ApiPublicOgHandleRouteImport } from './routes/api/public/og.$handle'
 
 const OnboardRoute = OnboardRouteImport.update({
   id: '/onboard',
@@ -52,6 +53,11 @@ const DashboardEditRoute = DashboardEditRouteImport.update({
   path: '/edit',
   getParentRoute: () => DashboardRoute,
 } as any)
+const ApiPublicOgHandleRoute = ApiPublicOgHandleRouteImport.update({
+  id: '/api/public/og/$handle',
+  path: '/api/public/og/$handle',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -61,6 +67,7 @@ export interface FileRoutesByFullPath {
   '/onboard': typeof OnboardRoute
   '/dashboard/edit': typeof DashboardEditRoute
   '/dashboard/': typeof DashboardIndexRoute
+  '/api/public/og/$handle': typeof ApiPublicOgHandleRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -69,6 +76,7 @@ export interface FileRoutesByTo {
   '/onboard': typeof OnboardRoute
   '/dashboard/edit': typeof DashboardEditRoute
   '/dashboard': typeof DashboardIndexRoute
+  '/api/public/og/$handle': typeof ApiPublicOgHandleRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -79,6 +87,7 @@ export interface FileRoutesById {
   '/onboard': typeof OnboardRoute
   '/dashboard/edit': typeof DashboardEditRoute
   '/dashboard/': typeof DashboardIndexRoute
+  '/api/public/og/$handle': typeof ApiPublicOgHandleRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -90,6 +99,7 @@ export interface FileRouteTypes {
     | '/onboard'
     | '/dashboard/edit'
     | '/dashboard/'
+    | '/api/public/og/$handle'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -98,6 +108,7 @@ export interface FileRouteTypes {
     | '/onboard'
     | '/dashboard/edit'
     | '/dashboard'
+    | '/api/public/og/$handle'
   id:
     | '__root__'
     | '/'
@@ -107,6 +118,7 @@ export interface FileRouteTypes {
     | '/onboard'
     | '/dashboard/edit'
     | '/dashboard/'
+    | '/api/public/og/$handle'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -115,6 +127,7 @@ export interface RootRouteChildren {
   DashboardRoute: typeof DashboardRouteWithChildren
   ExploreRoute: typeof ExploreRoute
   OnboardRoute: typeof OnboardRoute
+  ApiPublicOgHandleRoute: typeof ApiPublicOgHandleRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -168,6 +181,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardEditRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/api/public/og/$handle': {
+      id: '/api/public/og/$handle'
+      path: '/api/public/og/$handle'
+      fullPath: '/api/public/og/$handle'
+      preLoaderRoute: typeof ApiPublicOgHandleRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -191,6 +211,7 @@ const rootRouteChildren: RootRouteChildren = {
   DashboardRoute: DashboardRouteWithChildren,
   ExploreRoute: ExploreRoute,
   OnboardRoute: OnboardRoute,
+  ApiPublicOgHandleRoute: ApiPublicOgHandleRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

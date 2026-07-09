@@ -19,9 +19,7 @@ function NotFoundComponent() {
       <div className="max-w-md text-center chunky shadow-sticker-lg rounded-3xl bg-card p-10">
         <div className="text-7xl mb-2">🫧</div>
         <h1 className="text-6xl font-display italic">Lost in space</h1>
-        <p className="mt-3 text-muted-foreground">
-          This page floated away. Let's get you home.
-        </p>
+        <p className="mt-3 text-muted-foreground">This page floated away. Let's get you home.</p>
         <Link
           to="/"
           className="inline-flex mt-6 items-center justify-center rounded-full bg-lime text-ink chunky shadow-sticker px-6 py-3 font-semibold press"
@@ -50,12 +48,18 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-3">
           <button
-            onClick={() => { router.invalidate(); reset(); }}
+            onClick={() => {
+              router.invalidate();
+              reset();
+            }}
             className="rounded-full bg-ink text-paper chunky shadow-sticker px-5 py-2.5 font-semibold press"
           >
             Try again
           </button>
-          <a href="/" className="rounded-full bg-card chunky shadow-sticker px-5 py-2.5 font-semibold press">
+          <a
+            href="/"
+            className="rounded-full bg-card chunky shadow-sticker px-5 py-2.5 font-semibold press"
+          >
             Go home
           </a>
         </div>
@@ -70,12 +74,20 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "Fyora — Get paid from anywhere, land anywhere" },
-      { name: "description", content: "Fyora is the creator money page for chain-abstracted payments. Share one link, get paid from any chain, receive on your favorite one." },
+      {
+        name: "description",
+        content:
+          "Fyora is the creator money page for chain-abstracted payments. Share one link, get paid from any chain, receive on your favorite one.",
+      },
       { name: "author", content: "Fyora" },
       { property: "og:title", content: "Fyora — Get paid from anywhere" },
       { property: "og:description", content: "One link. Any chain. Instant support for creators." },
       { property: "og:type", content: "website" },
+      { property: "og:image", content: "/api/public/og/fyora" },
+      { property: "og:image:width", content: "1200" },
+      { property: "og:image:height", content: "630" },
       { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:image", content: "/api/public/og/fyora" },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
@@ -84,7 +96,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {
         rel: "stylesheet",
-        href: "https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Fraunces:ital,opsz,wght@0,9..144,600;0,9..144,800;1,9..144,700&display=swap",
+        href: "https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Fraunces:ital,opsz,wght@0,9..144,600;0,9..144,700;1,9..144,600;1,9..144,700&family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Archivo+Black&display=swap",
       },
     ],
   }),

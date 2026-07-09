@@ -67,7 +67,26 @@ function EditPage() {
     navigate({ to: "/dashboard" });
   };
 
-  const EMOJIS = ["🦊", "🐨", "🐳", "🦁", "🐸", "🌻", "🚀", "✨", "🐧", "🌊", "🌟", "🎨", "🎧", "🌙", "🌸", "🦖", "📚", "☕"];
+  const EMOJIS = [
+    "🦊",
+    "🐨",
+    "🐳",
+    "🦁",
+    "🐸",
+    "🌻",
+    "🚀",
+    "✨",
+    "🐧",
+    "🌊",
+    "🌟",
+    "🎨",
+    "🎧",
+    "🌙",
+    "🌸",
+    "🦖",
+    "📚",
+    "☕",
+  ];
 
   return (
     <div className="min-h-screen bg-paper text-ink">
@@ -75,7 +94,9 @@ function EditPage() {
       <div className="mx-auto max-w-6xl px-4 sm:px-6 py-8">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
           <div>
-            <Sticker color="lilac" rotate={-2}>Editor</Sticker>
+            <Sticker color="lilac" rotate={-2}>
+              Editor
+            </Sticker>
             <h1 className="font-display italic text-3xl sm:text-5xl mt-3">Tune your page</h1>
           </div>
           <div className="flex gap-2 flex-wrap">
@@ -94,12 +115,13 @@ function EditPage() {
           </div>
         </div>
 
-
         <div className="grid lg:grid-cols-2 gap-6">
           {/* Form */}
           <div className="rounded-3xl bg-card chunky-thick shadow-sticker-lg p-6 space-y-5">
             <div>
-              <div className="text-xs uppercase font-bold tracking-wider text-muted-foreground mb-1">Name</div>
+              <div className="text-xs uppercase font-bold tracking-wider text-muted-foreground mb-1">
+                Name
+              </div>
               <input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
@@ -107,7 +129,9 @@ function EditPage() {
               />
             </div>
             <div>
-              <div className="text-xs uppercase font-bold tracking-wider text-muted-foreground mb-1">Bio</div>
+              <div className="text-xs uppercase font-bold tracking-wider text-muted-foreground mb-1">
+                Bio
+              </div>
               <textarea
                 value={bio}
                 onChange={(e) => setBio(e.target.value)}
@@ -116,7 +140,9 @@ function EditPage() {
               />
             </div>
             <div>
-              <div className="text-xs uppercase font-bold tracking-wider text-muted-foreground mb-2">Emoji</div>
+              <div className="text-xs uppercase font-bold tracking-wider text-muted-foreground mb-2">
+                Emoji
+              </div>
               <div className="flex flex-wrap gap-2">
                 {EMOJIS.map((e) => (
                   <button
@@ -130,7 +156,9 @@ function EditPage() {
               </div>
             </div>
             <div>
-              <div className="text-xs uppercase font-bold tracking-wider text-muted-foreground mb-2">Settlement chain</div>
+              <div className="text-xs uppercase font-bold tracking-wider text-muted-foreground mb-2">
+                Settlement chain
+              </div>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                 {CHAINS.map((c) => (
                   <button
@@ -139,7 +167,10 @@ function EditPage() {
                     className={`rounded-2xl chunky p-3 text-left press ${chain === c.id ? "bg-lime shadow-sticker" : "bg-card shadow-sticker-sm"}`}
                   >
                     <div className="flex items-center gap-2">
-                      <div className="w-5 h-5 rounded-full border border-ink" style={{ background: c.color }} />
+                      <div
+                        className="w-5 h-5 rounded-full border border-ink"
+                        style={{ background: c.color }}
+                      />
                       <div className="font-semibold text-sm">{c.name}</div>
                     </div>
                   </button>
@@ -147,7 +178,9 @@ function EditPage() {
               </div>
             </div>
             <div>
-              <div className="text-xs uppercase font-bold tracking-wider text-muted-foreground mb-2">Token</div>
+              <div className="text-xs uppercase font-bold tracking-wider text-muted-foreground mb-2">
+                Token
+              </div>
               <div className="flex flex-wrap gap-2">
                 {TOKENS.map((t) => (
                   <button
@@ -161,7 +194,9 @@ function EditPage() {
               </div>
             </div>
             <div>
-              <div className="text-xs uppercase font-bold tracking-wider text-muted-foreground mb-1">Receive address</div>
+              <div className="text-xs uppercase font-bold tracking-wider text-muted-foreground mb-1">
+                Receive address
+              </div>
               <input
                 value={address}
                 onChange={(e) => setAddress(e.target.value)}
@@ -175,12 +210,21 @@ function EditPage() {
             <div className="text-xs uppercase font-bold tracking-wider text-muted-foreground mb-2 ml-1">
               Live preview
             </div>
-            <div className="rounded-3xl bg-card chunky-thick shadow-sticker-lg p-6" style={{ background: `linear-gradient(135deg, ${creator.gradient[0]}22, ${creator.gradient[1]}22), var(--card)` }}>
+            <div
+              className="rounded-3xl bg-card chunky-thick shadow-sticker-lg p-6"
+              style={{
+                background: `linear-gradient(135deg, ${creator.gradient[0]}22, ${creator.gradient[1]}22), var(--card)`,
+              }}
+            >
               <div className="flex items-start gap-4">
                 <EmojiAvatar emoji={emoji} gradient={creator.gradient} size={72} />
                 <div className="flex-1 min-w-0">
-                  <div className="font-display italic text-3xl leading-tight">{name || "Your name"}</div>
-                  <div className="mt-1"><HandleUrl handle={creator.handle} tone="plain" size="sm" /></div>
+                  <div className="font-display italic text-3xl leading-tight">
+                    {name || "Your name"}
+                  </div>
+                  <div className="mt-1">
+                    <HandleUrl handle={creator.handle} tone="plain" size="sm" />
+                  </div>
                   <p className="mt-2 text-sm">{bio || "Your bio shows here."}</p>
                 </div>
               </div>
@@ -190,7 +234,10 @@ function EditPage() {
               </div>
               <div className="mt-4 grid grid-cols-4 gap-2">
                 {[5, 10, 25, 50].map((a) => (
-                  <div key={a} className="rounded-xl chunky bg-card shadow-sticker-sm py-3 text-center font-display italic text-xl">
+                  <div
+                    key={a}
+                    className="rounded-xl chunky bg-card shadow-sticker-sm py-3 text-center font-display italic text-xl"
+                  >
                     ${a}
                   </div>
                 ))}

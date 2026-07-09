@@ -23,26 +23,18 @@ export function LogoMark({ size = 36 }: { size?: number }) {
         strokeWidth="2.5"
       />
       {/* K glyph — geometric, chunky */}
-      <path
-        d="M13 10 V30"
-        stroke="var(--ink)"
-        strokeWidth="3.4"
-        strokeLinecap="round"
-      />
-      <path
-        d="M13 21 L26 10"
-        stroke="var(--ink)"
-        strokeWidth="3.4"
-        strokeLinecap="round"
-      />
-      <path
-        d="M17.5 20.5 L28 30"
-        stroke="var(--ink)"
-        strokeWidth="3.4"
-        strokeLinecap="round"
-      />
+      <path d="M13 10 V30" stroke="var(--ink)" strokeWidth="3.4" strokeLinecap="round" />
+      <path d="M13 21 L26 10" stroke="var(--ink)" strokeWidth="3.4" strokeLinecap="round" />
+      <path d="M17.5 20.5 L28 30" stroke="var(--ink)" strokeWidth="3.4" strokeLinecap="round" />
       {/* coin dot */}
-      <circle cx="29.5" cy="11.5" r="2.6" fill="var(--coral)" stroke="var(--ink)" strokeWidth="1.6" />
+      <circle
+        cx="29.5"
+        cy="11.5"
+        r="2.6"
+        fill="var(--coral)"
+        stroke="var(--ink)"
+        strokeWidth="1.6"
+      />
     </svg>
   );
 }
@@ -50,12 +42,11 @@ export function LogoMark({ size = 36 }: { size?: number }) {
 export function Wordmark({ className = "" }: { className?: string }) {
   return (
     <span
-      className={`leading-none tracking-tight ${className}`}
+      className={`leading-none italic ${className}`}
       style={{
         fontFamily: "var(--font-brand)",
-        fontWeight: 800,
-        fontStyle: "italic",
-        letterSpacing: "-0.04em",
+        fontWeight: 700,
+        letterSpacing: "-0.02em",
       }}
     >
       fyora<span style={{ color: "var(--coral)" }}>.</span>
@@ -71,7 +62,6 @@ export function BrandLink() {
   );
 }
 
-
 /** Styled fyora.app/handle URL — brand prefix + mono handle */
 export function HandleUrl({
   handle,
@@ -82,8 +72,7 @@ export function HandleUrl({
   size?: "sm" | "md" | "lg";
   tone?: "chip" | "plain";
 }) {
-  const sz =
-    size === "lg" ? "text-base" : size === "sm" ? "text-[11px]" : "text-xs sm:text-sm";
+  const sz = size === "lg" ? "text-base" : size === "sm" ? "text-[11px]" : "text-xs sm:text-sm";
   const wrap =
     tone === "chip"
       ? "inline-flex items-center gap-0.5 rounded-full bg-secondary chunky px-3 py-1 max-w-full"
@@ -95,7 +84,7 @@ export function HandleUrl({
         style={{
           fontFamily: "var(--font-brand)",
           fontWeight: 700,
-          letterSpacing: "-0.02em",
+          letterSpacing: "-0.015em",
         }}
       >
         fyora<span style={{ color: "var(--coral)" }}>.</span>app

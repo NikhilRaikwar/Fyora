@@ -37,7 +37,9 @@ function Dashboard() {
     const count = creator.payments.length;
     const avg = count ? total / count : 0;
     const byChain: Record<string, number> = {};
-    creator.payments.forEach((p) => (byChain[p.fromChain] = (byChain[p.fromChain] ?? 0) + p.amountUsd));
+    creator.payments.forEach(
+      (p) => (byChain[p.fromChain] = (byChain[p.fromChain] ?? 0) + p.amountUsd),
+    );
     const topChain = Object.entries(byChain).sort((a, b) => b[1] - a[1])[0]?.[0] ?? "arbitrum";
     // fake week trend
     const week = [12, 18, 8, 24, 32, 16, Math.min(60, total / 5 + 20)];
@@ -65,11 +67,22 @@ function Dashboard() {
         {/* Top row */}
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
           <div className="flex items-center gap-4 min-w-0">
-            <EmojiAvatar emoji={creator.emoji} gradient={creator.gradient} size={64} className="sm:!w-[72px] sm:!h-[72px]" />
+            <EmojiAvatar
+              emoji={creator.emoji}
+              gradient={creator.gradient}
+              size={64}
+              className="sm:!w-[72px] sm:!h-[72px]"
+            />
             <div className="min-w-0">
-              <Sticker color="lime" rotate={-3}>Your dashboard</Sticker>
-              <h1 className="font-display italic text-3xl sm:text-5xl mt-2 truncate">Hi, {creator.name.split(" ")[0]}</h1>
-              <div className="mt-1"><HandleUrl handle={creator.handle} tone="plain" size="md" /></div>
+              <Sticker color="lime" rotate={-3}>
+                Your dashboard
+              </Sticker>
+              <h1 className="font-display italic text-3xl sm:text-5xl mt-2 truncate">
+                Hi, {creator.name.split(" ")[0]}
+              </h1>
+              <div className="mt-1">
+                <HandleUrl handle={creator.handle} tone="plain" size="md" />
+              </div>
             </div>
           </div>
           <div className="flex gap-2 flex-wrap">
@@ -89,12 +102,19 @@ function Dashboard() {
           </div>
         </div>
 
-
         {/* Stat cards */}
         <div className="mt-8 grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatCard label="Total received" value={<Odometer value={stats.total} prefix="$" />} bg="bg-lime" />
+          <StatCard
+            label="Total received"
+            value={<Odometer value={stats.total} prefix="$" />}
+            bg="bg-lime"
+          />
           <StatCard label="Supporters" value={<Odometer value={stats.count} />} bg="bg-lilac" />
-          <StatCard label="Avg tip" value={<Odometer value={stats.avg} prefix="$" decimals={2} />} bg="bg-butter" />
+          <StatCard
+            label="Avg tip"
+            value={<Odometer value={stats.avg} prefix="$" decimals={2} />}
+            bg="bg-butter"
+          />
           <div className="rounded-3xl bg-coral chunky shadow-sticker p-5">
             <div className="text-xs uppercase font-bold tracking-wider">Top source</div>
             <div className="mt-3">
@@ -118,7 +138,9 @@ function Dashboard() {
                     className="w-full rounded-t-xl chunky bg-lime shadow-sticker-sm"
                     style={{ height: `${(v / max) * 100}%`, minHeight: 8 }}
                   />
-                  <div className="text-[10px] text-muted-foreground">{["M","T","W","T","F","S","S"][i]}</div>
+                  <div className="text-[10px] text-muted-foreground">
+                    {["M", "T", "W", "T", "F", "S", "S"][i]}
+                  </div>
                 </div>
               ))}
             </div>
@@ -168,7 +190,6 @@ function Dashboard() {
               {creator.settlement.address}
             </span>
           </div>
-
         </div>
 
         {/* Payments table */}
@@ -198,13 +219,19 @@ function Dashboard() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="font-semibold truncate">{p.supporterName}</div>
-                    {p.note && <div className="text-xs text-muted-foreground italic truncate">"{p.note}"</div>}
+                    {p.note && (
+                      <div className="text-xs text-muted-foreground italic truncate">
+                        "{p.note}"
+                      </div>
+                    )}
                   </div>
                   <ChainBadge id={p.fromChain} size="sm" />
                   <span className="text-xs bg-lime chunky rounded-full px-2 py-0.5 font-semibold">
                     {p.status}
                   </span>
-                  <span className="font-display italic text-xl sm:text-2xl w-16 sm:w-20 text-right">${p.amountUsd}</span>
+                  <span className="font-display italic text-xl sm:text-2xl w-16 sm:w-20 text-right">
+                    ${p.amountUsd}
+                  </span>
                   <button
                     onClick={() => toast("Opening UniversalX…", { icon: "🚀" })}
                     className="w-8 h-8 rounded-full bg-card chunky shadow-sticker-sm flex items-center justify-center press"
@@ -222,20 +249,11 @@ function Dashboard() {
   );
 }
 
-function StatCard({
-  label,
-  value,
-  bg,
-}: {
-  label: string;
-  value: React.ReactNode;
-  bg: string;
-}) {
+function StatCard({ label, value, bg }: { label: string; value: React.ReactNode; bg: string }) {
   return (
     <div className={`rounded-3xl ${bg} chunky shadow-sticker p-5`}>
       <div className="text-xs uppercase font-bold tracking-wider">{label}</div>
       <div className="font-display italic text-3xl sm:text-4xl mt-1 truncate">{value}</div>
     </div>
-
   );
 }

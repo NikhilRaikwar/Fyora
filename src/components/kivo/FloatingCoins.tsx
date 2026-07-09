@@ -18,7 +18,12 @@ export function FloatingCoins() {
           className="absolute text-3xl md:text-4xl"
           style={{ top: c.top, left: c.left }}
           animate={{ y: [0, -14, 0], rotate: [-6, 8, -6] }}
-          transition={{ duration: 4 + i * 0.3, delay: c.delay, repeat: Infinity, ease: "easeInOut" }}
+          transition={{
+            duration: 4 + i * 0.3,
+            delay: c.delay,
+            repeat: Infinity,
+            ease: "easeInOut",
+          }}
         >
           {c.emoji}
         </motion.div>
