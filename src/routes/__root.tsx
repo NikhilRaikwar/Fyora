@@ -88,15 +88,15 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
           content: "One link. Any chain. Instant support for creators.",
         },
         { property: "og:type", content: "website" },
-        { property: "og:image", content: `${baseUrl}/api/public/og/fyora` },
+        { property: "og:image", content: `${baseUrl}/fyora-share-default.jpg` },
         { property: "og:image:width", content: "1200" },
         { property: "og:image:height", content: "630" },
         { name: "twitter:card", content: "summary_large_image" },
-        { name: "twitter:image", content: `${baseUrl}/api/public/og/fyora` },
+        { name: "twitter:image", content: `${baseUrl}/fyora-share-default.jpg` },
       ],
       links: [
         { rel: "stylesheet", href: appCss },
-        { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
+        { rel: "icon", href: "/fyora-favicon.png", type: "image/png" },
         { rel: "preconnect", href: "https://fonts.googleapis.com" },
         { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
         {
