@@ -17,7 +17,10 @@ import { HandleUrl } from "@/components/kivo/Logo";
 export const Route = createFileRoute("/$handle")({
   head: ({ params }) => {
     const baseUrl = typeof window !== "undefined" ? window.location.origin : "https://fyora.app";
-    const ogImage = `${baseUrl}/api/public/og/${params.handle}`;
+    const handle = (params.handle ?? "").toLowerCase();
+    const ogImage = handle === "nikhil"
+      ? `${baseUrl}/fyora-share-nikhil.jpg`
+      : `${baseUrl}/fyora-share-default.jpg`;
     return {
       meta: [
         { title: `Support @${params.handle} on Fyora` },
