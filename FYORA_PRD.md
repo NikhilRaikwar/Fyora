@@ -52,7 +52,13 @@ Judging alignment:
 
 **Magic Labs Bonus ($500)**
 
-Use Magic embedded wallets as the main supporter onboarding path. Fyora should feel like a consumer checkout: email or social login, automatic wallet creation, no MetaMask requirement, clear signing states, and polished mobile behavior.
+Use Magic embedded wallets as the main onboarding and signing path for both creators and supporters. Fyora should feel like a consumer checkout: email or social login, automatic wallet creation, no MetaMask requirement, clear signing states, and polished mobile behavior.
+
+Magic workshop context:
+
+- Event: `Social Login UX with Magic: Embedded Wallets That Feel Web2`
+- Date: July 22, 2026, 16:00
+- Relevance: Fyora should demonstrate walletless onboarding, social login, invisible wallet creation, and consumer-ready payment UX.
 
 **Arbitrum Bonus ($2,000, if available for this hackathon)**
 
@@ -102,6 +108,7 @@ Important implementation facts from docs:
 - Transfer transactions return a `rootHash` that must be signed before broadcast.
 - If a transaction includes undelegated `eip7702Auth` entries in `userOps`, Fyora must collect EIP-7702 authorization signatures and pass them to `sendTransaction()`.
 - Magic embedded wallets provide low-friction authentication, automatic non-custodial wallet creation, transaction signing, and multi-chain support.
+- For hackathon positioning, Magic should be the primary sign-in layer. Supabase Auth is not used in the MVP because it would split onboarding across two identity systems and weaken the Magic Labs bonus story.
 - Supabase publishable keys are acceptable in the frontend only when tables are protected by RLS; secret/service-role keys must stay server-side.
 - Supabase changed table exposure behavior in 2026: new tables may not be automatically available through the Data API, so migrations must include explicit grants where browser access is intended.
 
@@ -124,7 +131,7 @@ This PRD defines the required production migration from mock UI to real Magic + 
 - Public creator page at `/{handle}` using the production domain `https://www.fyora.app/{handle}`.
 - Creator onboarding with handle, display name, bio, avatar/emoji, links, and settlement settings.
 - Creator dashboard with total received, supporter list, settlement config, and UniversalX links.
-- Supabase Auth for creator accounts.
+- Magic embedded wallet/social login for creator accounts.
 - Supabase Postgres as the production source of truth for creators, settlement config, payment intents, and payment receipts.
 - Magic embedded wallet flow for supporters.
 - Particle Universal Account initialization in EIP-7702 mode.
@@ -158,12 +165,13 @@ This PRD defines the required production migration from mock UI to real Magic + 
 
 ### Creator Flow
 
-1. Creator signs in with Supabase Auth.
+1. Creator signs in with Magic embedded wallet using email or social login.
 2. Creator claims a unique handle.
-3. Creator fills display name, bio, emoji/avatar, links, and settlement config.
-4. Fyora stores the profile and settlement settings in Supabase.
-5. Creator shares `https://www.fyora.app/{handle}`.
-6. Creator dashboard displays real payment records from Supabase.
+3. Fyora stores the creator Magic EOA as the profile owner wallet.
+4. Creator fills display name, bio, emoji/avatar, links, and settlement config.
+5. Fyora stores the profile and settlement settings in Supabase through a server function.
+6. Creator shares `https://www.fyora.app/{handle}`.
+7. Creator dashboard displays real payment records from Supabase.
 
 ### Supporter Flow
 
@@ -184,7 +192,7 @@ This PRD defines the required production migration from mock UI to real Magic + 
 
 ```mermaid
 flowchart TD
-    Creator["Creator"] --> Auth["Supabase Auth"]
+    Creator["Creator"] --> Auth["Magic embedded wallet login"]
     Auth --> Dashboard["Fyora Dashboard"]
     Dashboard --> DB[("Supabase Postgres")]
     DB --> PublicPage["fyora.app/{handle}"]
@@ -216,7 +224,8 @@ Use Supabase Postgres as the source of truth. Keep Zustand only for local UI cac
 
 | Column | Type | Notes |
 |---|---|---|
-| id | uuid | Primary key, references `auth.users.id`. |
+| id | uuid | Primary key. |
+| owner_wallet_address | text | Magic EOA that owns this creator profile. |
 | handle | text | Unique, lowercase, public URL segment. |
 | display_name | text | Creator name. |
 | bio | text | Optional. |
@@ -261,12 +270,14 @@ Use Supabase Postgres as the source of truth. Keep Zustand only for local UI cac
 | created_at | timestamptz | Default `now()`. |
 | updated_at | timestamptz | Updated on write. |
 
-### RLS Policy Shape
+### Access Policy Shape
 
-- `profiles`: public `select`; creator-only `insert/update/delete` where `auth.uid() = id`.
-- `settlement_configs`: public `select` for active creator pages; creator-only writes through `profile_id`.
-- `payment_intents`: public insert only through a constrained server function or server route; public select only for safe fields shown on creator page; creator can select full payment list for their own profile.
-- No service-role key in frontend. Use service role only in TanStack server functions or Supabase Edge Functions if a write must bypass public RLS.
+- `profiles`: public `select` for published creator pages; no direct public writes.
+- `settlement_configs`: public `select` for active creator pages; no direct public writes.
+- `payment_intents`: no direct public writes; safe public read fields only where needed for creator pages.
+- Creator writes go through TanStack server functions or Supabase Edge Functions that verify the Magic-authenticated owner wallet address against `profiles.owner_wallet_address`.
+- Payment writes go through server functions so Fyora can enforce status transitions and avoid fake receipts.
+- No service-role key in frontend. Use service role only in server functions or Supabase Edge Functions.
 - Add explicit `GRANT` statements for `anon` and `authenticated` where Data API access is required, because new Supabase projects may not expose new public tables automatically.
 
 ## Environment Variables
@@ -318,7 +329,8 @@ Rules:
 
 ### Phase 2: Creator Account + Dashboard
 
-- Add Supabase Auth for creators.
+- Add Magic embedded wallet/social login for creators.
+- Store the creator Magic EOA as `profiles.owner_wallet_address`.
 - Update `/onboard` to create a real profile and settlement config.
 - Update `/dashboard` and `/dashboard/edit` to read/write Supabase data.
 - Keep public `/{handle}` readable without login.
@@ -345,7 +357,7 @@ Rules:
 - Add a demo checklist and README update.
 - Add a small real-transfer amount for judges.
 - Verify mobile checkout and dashboard layout.
-- Confirm deployed domain, Supabase Auth redirect URLs, Magic allowed origins, and Particle app domain include `https://www.fyora.app`.
+- Confirm deployed domain, Magic allowed origins, Particle app domain, and Supabase project settings include `https://www.fyora.app`.
 
 ## Acceptance Criteria
 
@@ -366,7 +378,7 @@ For production MVP:
 
 - No paid receipt is created unless `sendTransaction()` returns a transaction ID.
 - Payment state survives page refresh and different browser sessions.
-- RLS prevents creators from editing other creator profiles.
+- Server-side Magic owner-wallet checks prevent creators from editing other creator profiles.
 - Secret keys are absent from bundled frontend code.
 - Supabase policies and grants are documented in migrations.
 
@@ -397,7 +409,8 @@ Security:
 
 - Confirm `SUPABASE_SERVICE_ROLE_KEY` is not in client bundle.
 - Confirm public unauthenticated users cannot update profiles or settlement configs.
-- Confirm creator A cannot read private dashboard-only payment fields for creator B.
+- Confirm creator A cannot update creator B by changing request payloads.
+- Confirm private dashboard-only payment fields are returned only through owner-verified server functions.
 
 ## Demo Script
 
@@ -420,10 +433,10 @@ Security:
 |---|---|---|
 | Magic EIP-7702 signing API differs from Particle example | High | Isolate Magic signing in `magic.ts`; verify against installed SDK and Magic docs before final demo. |
 | Particle token support differs from PRD default | High | Verify token constants and supported chains against installed SDK and Particle docs; keep Arbitrum USDT as first demo target. |
-| Supabase RLS blocks public profile reads | Medium | Add explicit policies and grants in migrations; test logged-out public page. |
+| Supabase access policies block public profile reads | Medium | Add explicit public read policies/grants for safe fields; test logged-out public page. |
 | Payment row is marked confirmed too early | High | Only mark `confirmed` after `sendTransaction()` returns `transactionId`; otherwise keep `failed` or `submitted`. |
 | Mainnet funding is hard during demo | Medium | Use tiny transfer amount and pre-fund the Magic/UA account before judging. |
-| Domain redirect breaks auth | Medium | Configure Supabase Auth redirects, Magic allowed origins, Particle dashboard app domains, and deployment host for `https://www.fyora.app`. |
+| Domain redirect breaks auth | Medium | Configure Magic allowed origins, Particle dashboard app domains, Supabase project settings, and deployment host for `https://www.fyora.app`. |
 
 ## Final Recommendation
 
@@ -433,7 +446,7 @@ The strongest hackathon story is:
 
 ```txt
 Creator shares one Fyora link.
-Supporter logs in with Magic.
+Creator and supporter sign in with Magic.
 Particle Universal Accounts moves value cross-chain in EIP-7702 mode.
 Creator receives on Arbitrum.
 Supabase stores the production proof.
