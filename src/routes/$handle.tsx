@@ -1,4 +1,4 @@
-import { createFileRoute, Link, notFound } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { Header } from "@/components/kivo/Header";
 import { EmojiAvatar } from "@/components/kivo/EmojiAvatar";
 import { ChainBadge, TokenBadge } from "@/components/kivo/Badges";
@@ -7,20 +7,27 @@ import { Odometer } from "@/components/kivo/Odometer";
 import { CopyButton } from "@/components/kivo/CopyButton";
 import { WigglyDivider } from "@/components/kivo/WigglyDivider";
 import { PaymentSheet } from "@/components/kivo/PaymentSheet";
-import { useCreator, useKivo } from "@/lib/mock/store";
-import { useHydrated } from "@/lib/mock/useHydrated";
+import { getPublicCreatorFn } from "@/lib/fyora/server-functions";
 import { useState } from "react";
 import { motion } from "motion/react";
 import { Github, Globe, Youtube, Instagram, ArrowRight, Heart } from "lucide-react";
 import { HandleUrl } from "@/components/kivo/Logo";
 
 export const Route = createFileRoute("/$handle")({
+  loader: async ({ params }) => {
+    try {
+      return await getPublicCreatorFn({ data: { handle: params.handle } });
+    } catch {
+      return null;
+    }
+  },
   head: ({ params }) => {
     const baseUrl = typeof window !== "undefined" ? window.location.origin : "https://fyora.app";
     const handle = (params.handle ?? "").toLowerCase();
-    const ogImage = handle === "nikhil"
-      ? `${baseUrl}/fyora-share-nikhil.jpg`
-      : `${baseUrl}/fyora-share-default.jpg`;
+    const ogImage =
+      handle === "nikhil"
+        ? `${baseUrl}/fyora-share-nikhil.jpg`
+        : `${baseUrl}/fyora-share-default.jpg`;
     return {
       meta: [
         { title: `Support @${params.handle} on Fyora` },
@@ -44,7 +51,7 @@ export const Route = createFileRoute("/$handle")({
   component: Public,
 });
 
-const AMOUNTS = [5, 10, 25, 50];
+const AMOUNTS = [0.1, 1, 5, 10];
 
 function socialIcon(kind: string) {
   const cls = "w-4 h-4";
@@ -67,20 +74,11 @@ function fmtAgo(ms: number) {
 
 function Public() {
   const { handle } = Route.useParams();
-  const hydrated = useHydrated();
-  const creator = useCreator(handle);
-  const [amount, setAmount] = useState<number>(10);
+  const creator = Route.useLoaderData();
+  const [amount, setAmount] = useState<number>(0.1);
   const [custom, setCustom] = useState("");
   const [note, setNote] = useState("");
   const [open, setOpen] = useState(false);
-
-  if (!hydrated) {
-    return (
-      <div className="min-h-screen bg-paper">
-        <Header />
-      </div>
-    );
-  }
 
   if (!creator) {
     return (
@@ -105,7 +103,7 @@ function Public() {
   }
 
   const total = creator.payments.reduce((s, p) => s + p.amountUsd, 0);
-  const finalAmount = custom ? Math.max(1, Math.floor(Number(custom))) || amount : amount;
+  const finalAmount = custom ? Math.max(0.01, Number(Number(custom).toFixed(2))) || amount : amount;
 
   return (
     <div className="min-h-screen bg-paper text-ink">
@@ -192,7 +190,7 @@ function Public() {
           <div className="mt-3 flex items-center gap-2 bg-secondary chunky rounded-2xl px-4 py-3">
             <span className="text-muted-foreground text-lg">$</span>
             <input
-              inputMode="numeric"
+              inputMode="decimal"
               value={custom}
               onChange={(e) => setCustom(e.target.value.replace(/[^0-9.]/g, ""))}
               placeholder="Custom amount"

@@ -1,12 +1,17 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { SEED_CREATORS } from "@/lib/mock/creators";
 
 export const Route = createFileRoute("/api/public/og/$handle")({
   server: {
     handlers: {
       GET: async ({ params }) => {
         const rawHandle = (params.handle ?? "").replace(/\.(png|jpg|svg)$/i, "").toLowerCase();
-        const creator = SEED_CREATORS.find((c) => c.handle === rawHandle);
+        let creator = null;
+        try {
+          const { getPublicCreator } = await import("@/lib/fyora/data.server");
+          creator = await getPublicCreator(rawHandle);
+        } catch {
+          creator = null;
+        }
 
         const name = creator?.name ?? "Get paid from anywhere";
         const handle = creator?.handle ?? rawHandle ?? "yourname";

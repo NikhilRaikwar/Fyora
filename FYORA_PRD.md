@@ -1,6 +1,6 @@
 # Fyora PRD
 
-Last updated: 2026-07-10
+Last updated: 2026-07-11
 
 ## Product
 
@@ -33,20 +33,20 @@ Submit Fyora to the **Universal Accounts Track**.
 
 Track requirements and Fyora fit:
 
-| Requirement | Fyora response |
-|---|---|
-| Use Universal Accounts SDK in EIP-7702 mode | Payment flow initializes Particle Universal Account with the supporter EOA and EIP-7702 mode. |
+| Requirement                                            | Fyora response                                                                                                 |
+| ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------- |
+| Use Universal Accounts SDK in EIP-7702 mode            | Payment flow initializes Particle Universal Account with the supporter EOA and EIP-7702 mode.                  |
 | At least one cross-chain operation moving value via UA | Supporter payment uses `createTransferTransaction()` and `sendTransaction()` to settle to creator on Arbitrum. |
-| Functional deployed or runnable demo | Demo is deployed to `https://www.fyora.app/` or runnable locally with documented env vars. |
+| Functional deployed or runnable demo                   | Demo is deployed to `https://www.fyora.app/` or runnable locally with documented env vars.                     |
 
 Judging alignment:
 
-| Criteria | Weight | Fyora strategy |
-|---|---:|---|
-| UX excellence | 40% | Public creator page, no chain picker, no bridge UI, no gas explanation in the main path. |
-| Prominent UA + EIP-7702 use | 30% | Universal Account balance, EIP-7702 authorization, and cross-chain transfer are visible in the payment proof flow. |
-| Adoption potential | 20% | Creators already share bio links; Fyora turns that behavior into global crypto receiving. |
-| Technical quality and polish | 10% | Supabase-backed production state, explicit transaction proof, narrow MVP, clean error handling. |
+| Criteria                     | Weight | Fyora strategy                                                                                                     |
+| ---------------------------- | -----: | ------------------------------------------------------------------------------------------------------------------ |
+| UX excellence                |    40% | Public creator page, no chain picker, no bridge UI, no gas explanation in the main path.                           |
+| Prominent UA + EIP-7702 use  |    30% | Universal Account balance, EIP-7702 authorization, and cross-chain transfer are visible in the payment proof flow. |
+| Adoption potential           |    20% | Creators already share bio links; Fyora turns that behavior into global crypto receiving.                          |
+| Technical quality and polish |    10% | Supabase-backed production state, explicit transaction proof, narrow MVP, clean error handling.                    |
 
 ### Bonus Targets
 
@@ -114,15 +114,33 @@ Important implementation facts from docs:
 
 ## Current Repo State
 
-The current `fyora` app is a polished mock MVP:
+The `feat/real-multichain-integration` branch contains the production MVP integration:
 
-- TanStack Start/Vite/React app.
-- Public creator pages, onboarding, explore, dashboard, editor, QR/share, and OG image route exist.
-- Data source is still `src/lib/mock` with persisted Zustand state.
-- Payment sheet still uses mocked balances, mocked Magic timing, fake transaction IDs, and local payment insertion.
-- No Particle, Magic, or Supabase production SDKs are installed yet.
+- The existing TanStack Start UI, animation system, public pages, onboarding, dashboard, editor, QR/share, and OG layout are preserved.
+- Magic email OTP and Google login own authentication and embedded EVM/Solana wallets.
+- Particle Universal Accounts SDK runs in explicit EIP-7702 mode in the browser.
+- Checkout reads `getPrimaryAssets()`, creates a real transfer, signs EIP-7702 authorization plus `rootHash`, and calls `sendTransaction()`.
+- Supabase Postgres is the only source of truth for profiles, settlement settings, payment intents, and receipts.
+- Server-side Particle JSON-RPC verification gates confirmation and validates receiver, chain, token, and received USD value.
+- Persisted mock creators, fake balances, fake transaction IDs, and demo receiver controls have been removed.
+- The migration is applied to Supabase project `vfyrqjdossnpatrlkatp`.
+- The Cloudflare production build passes; a credentialed mainnet transfer is the remaining operator acceptance test.
 
-This PRD defines the required production migration from mock UI to real Magic + Particle + Supabase.
+## Supported Destination Matrix
+
+Settlement choices are pinned to Particle UA SDK `2.0.3` primary assets:
+
+| Destination  | Assets exposed in Fyora |
+| ------------ | ----------------------- |
+| Ethereum     | USDT, USDC              |
+| BNB Chain    | USDT, USDC              |
+| Base         | USDC                    |
+| Arbitrum One | USDT, USDC              |
+| Solana       | USDT, USDC              |
+
+X Layer is supported by UA but hidden because SDK `2.0.3` does not expose a primary destination token for it. Arbitrum USDT is the default, not the only destination.
+
+Supporters may fund UA routes from native or stable assets. Creator destinations are USDC/USDT only because checkout is USD-denominated and `createTransferTransaction()` accepts destination token units.
 
 ## MVP Scope
 
@@ -208,7 +226,7 @@ flowchart TD
     Transfer --> Sign["Sign rootHash + eip7702Auth"]
     Sign --> Send["sendTransaction"]
     Send --> Particle["Particle routing and liquidity"]
-    Particle --> Arbitrum["Creator receives on Arbitrum"]
+    Particle --> Destination["Creator-selected supported destination"]
     Send --> ReceiptDB["Supabase receipt row"]
     ReceiptDB --> Receipt["UniversalX receipt"]
     ReceiptDB --> Dashboard
@@ -216,69 +234,73 @@ flowchart TD
 
 ## Data Model
 
-Use Supabase Postgres as the source of truth. Keep Zustand only for local UI cache/transient state.
+Use Supabase Postgres as the source of truth. TanStack Query is the client cache; no persisted client data store is used.
 
 ### Tables
 
 `profiles`
 
-| Column | Type | Notes |
-|---|---|---|
-| id | uuid | Primary key. |
-| owner_wallet_address | text | Magic EOA that owns this creator profile. |
-| handle | text | Unique, lowercase, public URL segment. |
-| display_name | text | Creator name. |
-| bio | text | Optional. |
-| avatar_emoji | text | Keep current UI style for MVP. |
-| gradient | jsonb | Two-color tuple from existing UI. |
-| socials | jsonb | Array of `{ kind, url }`. |
-| created_at | timestamptz | Default `now()`. |
-| updated_at | timestamptz | Updated on write. |
+| Column               | Type        | Notes                                       |
+| -------------------- | ----------- | ------------------------------------------- |
+| id                   | uuid        | Primary key.                                |
+| owner_magic_issuer   | text        | Unique Magic issuer used for authorization. |
+| owner_evm_address    | text        | Lowercase Magic EVM EOA.                    |
+| owner_solana_address | text        | Optional Magic Solana address.              |
+| handle               | text        | Unique, lowercase public URL segment.       |
+| display_name         | text        | Creator name.                               |
+| bio                  | text        | Optional.                                   |
+| avatar_emoji         | text        | Existing visual identity.                   |
+| gradient             | jsonb       | Two-color tuple.                            |
+| socials              | jsonb       | Array of `{ kind, url }`.                   |
+| published            | boolean     | Public visibility flag.                     |
+| created_at           | timestamptz | Default `now()`.                            |
+| updated_at           | timestamptz | Updated by trigger.                         |
 
 `settlement_configs`
 
-| Column | Type | Notes |
-|---|---|---|
-| id | uuid | Primary key. |
-| profile_id | uuid | References `profiles.id`, unique. |
-| receiver_address | text | Creator wallet address. |
-| chain_id | integer | Default `42161`. |
-| chain_slug | text | Default `arbitrum`. |
-| token_symbol | text | Default `USDT`. |
-| token_address | text | Arbitrum token contract. |
-| token_decimals | integer | Default `6`. |
-| created_at | timestamptz | Default `now()`. |
-| updated_at | timestamptz | Updated on write. |
+| Column           | Type        | Notes                                   |
+| ---------------- | ----------- | --------------------------------------- |
+| id               | uuid        | Primary key.                            |
+| profile_id       | uuid        | References `profiles.id`, unique.       |
+| network_type     | text        | `evm` or `solana`.                      |
+| receiver_address | text        | Address provisioned by Magic.           |
+| chain_id         | integer     | Particle-supported destination.         |
+| chain_slug       | text        | Stable UI slug.                         |
+| token_symbol     | text        | Particle-supported destination asset.   |
+| token_address    | text        | Contract, mint, or native zero address. |
+| token_decimals   | integer     | Destination asset decimals.             |
+| created_at       | timestamptz | Default `now()`.                        |
+| updated_at       | timestamptz | Updated by trigger.                     |
 
-`payment_intents`
+`payments`
 
-| Column | Type | Notes |
-|---|---|---|
-| id | uuid | Primary key. |
-| profile_id | uuid | Creator being supported. |
-| supporter_address | text | Magic EOA after connect. |
-| supporter_label | text | Optional email/name label, never required publicly. |
-| amount_usd | numeric | Human-entered support amount. |
-| note | text | Optional public note. |
-| status | text | `created`, `wallet_connected`, `submitted`, `confirmed`, `failed`. |
-| destination_chain_id | integer | Copied from settlement config at payment time. |
-| destination_token_address | text | Copied from settlement config at payment time. |
-| transaction_id | text | Particle result ID. |
-| universalx_url | text | `https://universalx.app/activity/details?id=...`. |
-| error_message | text | Safe user-facing failure reason. |
-| raw_result | jsonb | Particle result metadata, no secrets. |
-| created_at | timestamptz | Default `now()`. |
-| updated_at | timestamptz | Updated on write. |
+| Column                    | Type        | Notes                                                                   |
+| ------------------------- | ----------- | ----------------------------------------------------------------------- |
+| id                        | uuid        | Primary key.                                                            |
+| profile_id                | uuid        | Creator being supported.                                                |
+| idempotency_key           | uuid        | Prevents duplicate checkout records.                                    |
+| supporter_evm_address     | text        | Magic EOA after connect.                                                |
+| supporter_name            | text        | Optional display label.                                                 |
+| supporter_emoji           | text        | Public supporter avatar.                                                |
+| amount_usd                | numeric     | Human-entered support amount.                                           |
+| note                      | text        | Optional public note.                                                   |
+| status                    | text        | `created`, `submitted`, `refunding`, `refunded`, `confirmed`, `failed`. |
+| destination_chain_id      | integer     | Copied from settlement config at payment time.                          |
+| destination_token_address | text        | Copied from settlement config at payment time.                          |
+| particle_transaction_id   | text        | Unique Particle transaction ID.                                         |
+| universalx_url            | text        | `https://universalx.app/activity/details?id=...`.                       |
+| error_message             | text        | Safe user-facing failure reason.                                        |
+| raw_result                | jsonb       | Particle result metadata, no secrets.                                   |
+| created_at                | timestamptz | Default `now()`.                                                        |
+| updated_at                | timestamptz | Updated on write.                                                       |
 
 ### Access Policy Shape
 
-- `profiles`: public `select` for published creator pages; no direct public writes.
-- `settlement_configs`: public `select` for active creator pages; no direct public writes.
-- `payment_intents`: no direct public writes; safe public read fields only where needed for creator pages.
-- Creator writes go through TanStack server functions or Supabase Edge Functions that verify the Magic-authenticated owner wallet address against `profiles.owner_wallet_address`.
+- All three tables have RLS enabled, no anon/authenticated grants, and no browser policies.
+- Public creator reads and every write go through TanStack server functions using the server-only Supabase secret key.
+- Creator mutations validate a fresh Magic DID token and match `profiles.owner_magic_issuer`.
 - Payment writes go through server functions so Fyora can enforce status transitions and avoid fake receipts.
-- No service-role key in frontend. Use service role only in server functions or Supabase Edge Functions.
-- Add explicit `GRANT` statements for `anon` and `authenticated` where Data API access is required, because new Supabase projects may not expose new public tables automatically.
+- The service-role key is never sent to the browser.
 
 ## Environment Variables
 
@@ -306,58 +328,56 @@ VITE_FYORA_DEFAULT_TOKEN_DECIMALS="6"
 Server-only:
 
 ```env
+SUPABASE_URL="https://vfyrqjdossnpatrlkatp.supabase.co"
 SUPABASE_SECRET_KEY="..."
-SUPABASE_SERVICE_ROLE_KEY="..."
+MAGIC_SECRET_KEY="..."
 ```
 
 Rules:
 
 - Never commit `.env` files.
-- Never expose `SUPABASE_SECRET_KEY` or `SUPABASE_SERVICE_ROLE_KEY` to browser code.
+- Never expose `SUPABASE_SECRET_KEY` or `MAGIC_SECRET_KEY` to browser code.
 - Keep Particle and Magic public client keys in `VITE_` vars only when their docs classify them as browser-safe.
 
 ## Implementation Plan
 
 ### Phase 1: Production Data Foundation
 
-- Add `@supabase/supabase-js`.
-- Add Supabase client helpers for browser and server contexts.
-- Add migrations for `profiles`, `settlement_configs`, and `payment_intents`.
-- Enable RLS and explicit grants.
-- Seed demo creators only through a migration or controlled seed script, not Zustand.
-- Replace `src/lib/mock/store.ts` as source of truth; keep a small UI cache if useful.
+- [x] Add `@supabase/supabase-js` and a server-only database helper.
+- [x] Add migrations for `profiles`, `settlement_configs`, and `payments`.
+- [x] Enable RLS, revoke browser roles, and grant only `service_role`.
+- [x] Remove the persisted Zustand mock source of truth and seed creators.
 
 ### Phase 2: Creator Account + Dashboard
 
-- Add Magic embedded wallet/social login for creators.
-- Store the creator Magic EOA as `profiles.owner_wallet_address`.
-- Update `/onboard` to create a real profile and settlement config.
-- Update `/dashboard` and `/dashboard/edit` to read/write Supabase data.
-- Keep public `/{handle}` readable without login.
-- Use `https://www.fyora.app/{handle}` everywhere for QR/copy/share.
-- Add `https://x.com/getfyora` to public footer/submission collateral.
+- [x] Add Magic email OTP and Google login for creators.
+- [x] Store Magic issuer plus EVM/Solana wallet addresses.
+- [x] Update `/onboard` to create a real profile and settlement config.
+- [x] Update `/dashboard` and `/dashboard/edit` to read/write Supabase data.
+- [x] Keep public `/{handle}` readable without login.
+- [x] Use `https://www.fyora.app/{handle}` for QR/copy/share.
+- [x] Add `https://x.com/getfyora` to repository collateral.
 
 ### Phase 3: Particle + Magic Payment Flow
 
-- Add `@particle-network/universal-account-sdk`, `magic-sdk`, and `ethers`.
-- Add `src/lib/fyora/config.ts`, `particle.ts`, `magic.ts`, `supabase.ts`, and `types.ts`.
-- Implement Magic connect and EOA retrieval.
-- Initialize Universal Account with Particle project credentials and supporter EOA.
-- Read `getPrimaryAssets()`.
-- Create Supabase payment intent before signing.
-- Build transfer with `createTransferTransaction({ token, amount, receiver })`.
-- Sign `rootHash`.
-- Collect inline EIP-7702 authorizations from `transaction.userOps` when required.
-- Submit with `sendTransaction()`.
-- Store transaction proof and UniversalX URL in Supabase.
+- [x] Add the Particle UA SDK, Magic SDK/extensions, and ethers.
+- [x] Implement Magic wallet retrieval and fresh DID tokens.
+- [x] Initialize Universal Account in explicit EIP-7702 mode.
+- [x] Read `getPrimaryAssets()` and render real balances.
+- [x] Create an idempotent Supabase payment intent before signing.
+- [x] Build the transfer with `createTransferTransaction()`.
+- [x] Sign `rootHash` and undelegated EIP-7702 authorizations.
+- [x] Submit with `sendTransaction()`.
+- [x] Verify status/destination server-side and store UniversalX proof.
 
 ### Phase 4: Hackathon Polish
 
-- Add clear loading/error states for missing env, Magic cancellation, insufficient unified balance, EIP-7702 decline, Particle failure, and Supabase write failure.
-- Add a demo checklist and README update.
-- Add a small real-transfer amount for judges.
-- Verify mobile checkout and dashboard layout.
-- Confirm deployed domain, Magic allowed origins, Particle app domain, and Supabase project settings include `https://www.fyora.app`.
+- [x] Add actionable loading/error/insufficient-balance states.
+- [x] Add the README demo checklist and `$0.10` preset.
+- [x] Verify desktop/mobile public and login layouts with Playwright.
+- [ ] Add production credentials and run a real cross-chain transfer.
+- [ ] Confirm Magic allowed origins and Particle app domain include `https://www.fyora.app`.
+- [ ] Deploy the branch and run the full acceptance script on `fyora.app`.
 
 ## Acceptance Criteria
 
@@ -429,14 +449,14 @@ Security:
 
 ## Risks And Mitigations
 
-| Risk | Impact | Mitigation |
-|---|---|---|
-| Magic EIP-7702 signing API differs from Particle example | High | Isolate Magic signing in `magic.ts`; verify against installed SDK and Magic docs before final demo. |
-| Particle token support differs from PRD default | High | Verify token constants and supported chains against installed SDK and Particle docs; keep Arbitrum USDT as first demo target. |
-| Supabase access policies block public profile reads | Medium | Add explicit public read policies/grants for safe fields; test logged-out public page. |
-| Payment row is marked confirmed too early | High | Only mark `confirmed` after `sendTransaction()` returns `transactionId`; otherwise keep `failed` or `submitted`. |
-| Mainnet funding is hard during demo | Medium | Use tiny transfer amount and pre-fund the Magic/UA account before judging. |
-| Domain redirect breaks auth | Medium | Configure Magic allowed origins, Particle dashboard app domains, Supabase project settings, and deployment host for `https://www.fyora.app`. |
+| Risk                                                     | Impact | Mitigation                                                                                                                                   |
+| -------------------------------------------------------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| Magic EIP-7702 signing API differs from Particle example | High   | Isolate Magic signing in `magic.ts`; verify against installed SDK and Magic docs before final demo.                                          |
+| Particle token support differs from PRD default          | High   | Verify token constants and supported chains against installed SDK and Particle docs; keep Arbitrum USDT as first demo target.                |
+| Supabase access policies block public profile reads      | Medium | Add explicit public read policies/grants for safe fields; test logged-out public page.                                                       |
+| Payment row is marked confirmed too early                | High   | Only mark `confirmed` after `sendTransaction()` returns `transactionId`; otherwise keep `failed` or `submitted`.                             |
+| Mainnet funding is hard during demo                      | Medium | Use tiny transfer amount and pre-fund the Magic/UA account before judging.                                                                   |
+| Domain redirect breaks auth                              | Medium | Configure Magic allowed origins, Particle dashboard app domains, Supabase project settings, and deployment host for `https://www.fyora.app`. |
 
 ## Final Recommendation
 

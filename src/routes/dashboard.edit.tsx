@@ -3,9 +3,10 @@ import { Header } from "@/components/kivo/Header";
 import { EmojiAvatar } from "@/components/kivo/EmojiAvatar";
 import { ChainBadge, TokenBadge } from "@/components/kivo/Badges";
 import { Sticker } from "@/components/kivo/Sticker";
-import { useKivo } from "@/lib/mock/store";
-import { useHydrated } from "@/lib/mock/useHydrated";
-import { CHAINS, TOKENS } from "@/lib/mock/chains";
+import { MagicLoginCard } from "@/components/kivo/MagicLoginCard";
+import { useCurrentCreator } from "@/lib/fyora/hooks";
+import { updateCreatorFn } from "@/lib/fyora/server-functions";
+import { SETTLEMENT_CHAINS, settlementAssetsForChain } from "@/lib/fyora/settlement";
 import { useEffect, useState } from "react";
 import { Save, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
@@ -24,9 +25,7 @@ export const Route = createFileRoute("/dashboard/edit")({
 });
 
 function EditPage() {
-  const hydrated = useHydrated();
-  const creator = useKivo((s) => s.creators[s.currentHandle]);
-  const upsert = useKivo((s) => s.upsertCreator);
+  const { creator, identity, loading, isLoading, refreshIdentity, refetch } = useCurrentCreator();
   const navigate = useNavigate();
 
   const [name, setName] = useState("");
@@ -34,7 +33,7 @@ function EditPage() {
   const [emoji, setEmoji] = useState("🦊");
   const [chain, setChain] = useState("arbitrum");
   const [token, setToken] = useState("usdc");
-  const [address, setAddress] = useState("");
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (creator) {
@@ -43,11 +42,10 @@ function EditPage() {
       setEmoji(creator.emoji);
       setChain(creator.settlement.chain);
       setToken(creator.settlement.token);
-      setAddress(creator.settlement.address);
     }
-  }, [creator?.handle]);
+  }, [creator]);
 
-  if (!hydrated || !creator) {
+  if (loading || isLoading) {
     return (
       <div className="min-h-screen bg-paper">
         <Header />
@@ -55,16 +53,61 @@ function EditPage() {
     );
   }
 
-  const save = () => {
-    upsert({
-      ...creator,
-      name,
-      bio,
-      emoji,
-      settlement: { chain, token, address },
-    });
-    toast.success("Saved!");
-    navigate({ to: "/dashboard" });
+  if (!identity) {
+    return (
+      <div className="min-h-screen bg-paper text-ink">
+        <Header />
+        <div className="px-4 py-16">
+          <MagicLoginCard />
+        </div>
+      </div>
+    );
+  }
+
+  if (!creator) {
+    return (
+      <div className="min-h-screen bg-paper text-ink">
+        <Header />
+        <div className="px-4 py-16 text-center">
+          <Link
+            to="/onboard"
+            className="rounded-full bg-lime chunky shadow-sticker px-5 py-3 font-semibold press"
+          >
+            Claim your page
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  const selectedChain = SETTLEMENT_CHAINS.find((item) => item.chainSlug === chain)!;
+  const chainAssets = settlementAssetsForChain(selectedChain.chainId);
+  const selectedAsset = chainAssets.find((item) => item.tokenId === token) ?? chainAssets[0];
+  const address =
+    selectedAsset.networkType === "solana" ? (identity.solanaAddress ?? "") : identity.evmAddress;
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      const currentIdentity = await refreshIdentity();
+      await updateCreatorFn({
+        data: {
+          didToken: currentIdentity.didToken,
+          name,
+          bio,
+          emoji,
+          chainId: selectedAsset.chainId,
+          tokenAddress: selectedAsset.tokenAddress,
+        },
+      });
+      await refetch();
+      toast.success("Saved!");
+      navigate({ to: "/dashboard" });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not save your profile.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const EMOJIS = [
@@ -108,9 +151,10 @@ function EditPage() {
             </Link>
             <button
               onClick={save}
+              disabled={saving || !address}
               className="inline-flex items-center gap-1 rounded-full bg-lime text-ink chunky shadow-sticker px-4 py-2 font-semibold press text-sm"
             >
-              <Save className="w-4 h-4" /> Save
+              <Save className="w-4 h-4" /> {saving ? "Saving..." : "Save"}
             </button>
           </div>
         </div>
@@ -160,18 +204,21 @@ function EditPage() {
                 Settlement chain
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                {CHAINS.map((c) => (
+                {SETTLEMENT_CHAINS.map((c) => (
                   <button
-                    key={c.id}
-                    onClick={() => setChain(c.id)}
-                    className={`rounded-2xl chunky p-3 text-left press ${chain === c.id ? "bg-lime shadow-sticker" : "bg-card shadow-sticker-sm"}`}
+                    key={c.chainId}
+                    onClick={() => {
+                      setChain(c.chainSlug);
+                      setToken(settlementAssetsForChain(c.chainId)[0].tokenId);
+                    }}
+                    className={`rounded-2xl chunky p-3 text-left press ${chain === c.chainSlug ? "bg-lime shadow-sticker" : "bg-card shadow-sticker-sm"}`}
                   >
                     <div className="flex items-center gap-2">
                       <div
                         className="w-5 h-5 rounded-full border border-ink"
-                        style={{ background: c.color }}
+                        style={{ background: c.chainColor }}
                       />
-                      <div className="font-semibold text-sm">{c.name}</div>
+                      <div className="font-semibold text-sm">{c.chainName}</div>
                     </div>
                   </button>
                 ))}
@@ -182,13 +229,13 @@ function EditPage() {
                 Token
               </div>
               <div className="flex flex-wrap gap-2">
-                {TOKENS.map((t) => (
+                {chainAssets.map((t) => (
                   <button
-                    key={t.id}
-                    onClick={() => setToken(t.id)}
-                    className={`rounded-full chunky px-4 py-2 press font-semibold ${token === t.id ? "bg-lime shadow-sticker" : "bg-card shadow-sticker-sm"}`}
+                    key={t.tokenAddress}
+                    onClick={() => setToken(t.tokenId)}
+                    className={`rounded-full chunky px-4 py-2 press font-semibold ${token === t.tokenId ? "bg-lime shadow-sticker" : "bg-card shadow-sticker-sm"}`}
                   >
-                    {t.emoji} {t.symbol}
+                    {t.tokenEmoji} {t.tokenSymbol}
                   </button>
                 ))}
               </div>
@@ -199,7 +246,7 @@ function EditPage() {
               </div>
               <input
                 value={address}
-                onChange={(e) => setAddress(e.target.value)}
+                readOnly
                 className="w-full bg-secondary chunky rounded-2xl px-4 py-3 outline-none font-mono text-sm"
               />
             </div>

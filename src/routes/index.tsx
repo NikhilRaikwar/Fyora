@@ -6,11 +6,18 @@ import { FloatingCoins } from "@/components/kivo/FloatingCoins";
 import { EmojiAvatar } from "@/components/kivo/EmojiAvatar";
 import { motion } from "motion/react";
 import { useState } from "react";
-import { SEED_CREATORS } from "@/lib/mock/creators";
+import { listPublicCreatorsFn } from "@/lib/fyora/server-functions";
 import { ChainBadge } from "@/components/kivo/Badges";
 import { ArrowRight, Zap, Globe2, Sparkles } from "lucide-react";
 
 export const Route = createFileRoute("/")({
+  loader: async () => {
+    try {
+      return await listPublicCreatorsFn();
+    } catch {
+      return [];
+    }
+  },
   head: () => ({
     meta: [
       { title: "Fyora — Get paid from anywhere, land anywhere" },
@@ -27,6 +34,7 @@ export const Route = createFileRoute("/")({
 });
 
 function Landing() {
+  const creators = Route.useLoaderData();
   const [handle, setHandle] = useState("");
   const navigate = useNavigate();
   const clean = handle
@@ -115,7 +123,7 @@ function Landing() {
               Creators already on Fyora
             </div>
             <div className="flex flex-wrap justify-center gap-3">
-              {SEED_CREATORS.slice(0, 6).map((c, i) => (
+              {creators.slice(0, 6).map((c, i) => (
                 <Link
                   key={c.handle}
                   to="/$handle"
@@ -208,7 +216,7 @@ function Landing() {
             </Link>
           </div>
           <div className="grid sm:grid-cols-2 md:grid-cols-4 gap-4">
-            {SEED_CREATORS.slice(0, 4).map((c) => (
+            {creators.slice(0, 4).map((c) => (
               <Link
                 key={c.handle}
                 to="/$handle"
