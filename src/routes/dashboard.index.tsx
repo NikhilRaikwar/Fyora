@@ -7,9 +7,9 @@ import { Odometer } from "@/components/kivo/Odometer";
 import { CopyButton } from "@/components/kivo/CopyButton";
 import { HandleUrl } from "@/components/kivo/Logo";
 import { QRCodeSVG } from "qrcode.react";
-import { useKivo } from "@/lib/mock/store";
-import { useHydrated } from "@/lib/mock/useHydrated";
-import { chainById } from "@/lib/mock/chains";
+import { MagicLoginCard } from "@/components/kivo/MagicLoginCard";
+import { useCurrentCreator } from "@/lib/fyora/hooks";
+import { chainById } from "@/lib/fyora/chains";
 import { ExternalLink, Eye, Pencil, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { useMemo } from "react";
@@ -27,9 +27,7 @@ export const Route = createFileRoute("/dashboard/")({
 });
 
 function Dashboard() {
-  const hydrated = useHydrated();
-  const creator = useKivo((s) => s.creators[s.currentHandle]);
-  const reset = useKivo((s) => s.resetDemo);
+  const { creator, identity, loading, isLoading, refetch } = useCurrentCreator();
 
   const stats = useMemo(() => {
     if (!creator) return { total: 0, count: 0, avg: 0, topChain: "arbitrum", week: [] as number[] };
@@ -41,12 +39,18 @@ function Dashboard() {
       (p) => (byChain[p.fromChain] = (byChain[p.fromChain] ?? 0) + p.amountUsd),
     );
     const topChain = Object.entries(byChain).sort((a, b) => b[1] - a[1])[0]?.[0] ?? "arbitrum";
-    // fake week trend
-    const week = [12, 18, 8, 24, 32, 16, Math.min(60, total / 5 + 20)];
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    start.setDate(start.getDate() - 6);
+    const week = Array.from({ length: 7 }, () => 0);
+    creator.payments.forEach((payment) => {
+      const index = Math.floor((payment.createdAt - start.getTime()) / 86_400_000);
+      if (index >= 0 && index < 7) week[index] += payment.amountUsd;
+    });
     return { total, count, avg, topChain, week };
   }, [creator]);
 
-  if (!hydrated || !creator) {
+  if (loading || isLoading) {
     return (
       <div className="min-h-screen bg-paper">
         <Header />
@@ -57,8 +61,35 @@ function Dashboard() {
     );
   }
 
+  if (!identity) {
+    return (
+      <div className="min-h-screen bg-paper text-ink">
+        <Header />
+        <div className="px-4 py-16">
+          <MagicLoginCard />
+        </div>
+      </div>
+    );
+  }
+
+  if (!creator) {
+    return (
+      <div className="min-h-screen bg-paper text-ink">
+        <Header />
+        <div className="px-4 py-16 text-center">
+          <Link
+            to="/onboard"
+            className="rounded-full bg-lime chunky shadow-sticker px-5 py-3 font-semibold press"
+          >
+            Claim your page
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   const shareUrl = `https://fyora.app/${creator.handle}`;
-  const max = Math.max(...stats.week);
+  const max = Math.max(...stats.week, 1);
 
   return (
     <div className="min-h-screen bg-paper text-ink">
@@ -129,7 +160,7 @@ function Dashboard() {
           <div className="lg:col-span-2 rounded-3xl bg-card chunky-thick shadow-sticker-lg p-6">
             <div className="flex items-center justify-between mb-3">
               <h2 className="font-display italic text-2xl sm:text-3xl">This week</h2>
-              <div className="text-xs text-muted-foreground">last 7 days · demo data</div>
+              <div className="text-xs text-muted-foreground">last 7 days · confirmed payments</div>
             </div>
             <div className="flex items-end gap-2 h-40">
               {stats.week.map((v, i) => (
@@ -198,12 +229,12 @@ function Dashboard() {
             <h2 className="font-display italic text-2xl sm:text-3xl">Recent payments</h2>
             <button
               onClick={() => {
-                reset();
-                toast("Demo data reset");
+                refetch();
+                toast("Payments refreshed");
               }}
               className="inline-flex items-center gap-1 text-xs rounded-full bg-card chunky shadow-sticker-sm px-3 py-1.5 font-semibold press"
             >
-              <RefreshCw className="w-3 h-3" /> Reset demo
+              <RefreshCw className="w-3 h-3" /> Refresh
             </button>
           </div>
           {creator.payments.length === 0 ? (
@@ -233,7 +264,11 @@ function Dashboard() {
                     ${p.amountUsd}
                   </span>
                   <button
-                    onClick={() => toast("Opening UniversalX…", { icon: "🚀" })}
+                    onClick={() =>
+                      p.universalxUrl &&
+                      window.open(p.universalxUrl, "_blank", "noopener,noreferrer")
+                    }
+                    disabled={!p.universalxUrl}
                     className="w-8 h-8 rounded-full bg-card chunky shadow-sticker-sm flex items-center justify-center press"
                     title="View tx"
                   >

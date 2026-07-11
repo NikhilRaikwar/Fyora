@@ -16,6 +16,7 @@ import { Route as HandleRouteImport } from './routes/$handle'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as DashboardIndexRouteImport } from './routes/dashboard.index'
 import { Route as DashboardEditRouteImport } from './routes/dashboard.edit'
+import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
 import { Route as ApiPublicOgHandleRouteImport } from './routes/api/public/og.$handle'
 
 const OnboardRoute = OnboardRouteImport.update({
@@ -53,6 +54,11 @@ const DashboardEditRoute = DashboardEditRouteImport.update({
   path: '/edit',
   getParentRoute: () => DashboardRoute,
 } as any)
+const AuthCallbackRoute = AuthCallbackRouteImport.update({
+  id: '/auth/callback',
+  path: '/auth/callback',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicOgHandleRoute = ApiPublicOgHandleRouteImport.update({
   id: '/api/public/og/$handle',
   path: '/api/public/og/$handle',
@@ -65,6 +71,7 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof DashboardRouteWithChildren
   '/explore': typeof ExploreRoute
   '/onboard': typeof OnboardRoute
+  '/auth/callback': typeof AuthCallbackRoute
   '/dashboard/edit': typeof DashboardEditRoute
   '/dashboard/': typeof DashboardIndexRoute
   '/api/public/og/$handle': typeof ApiPublicOgHandleRoute
@@ -74,6 +81,7 @@ export interface FileRoutesByTo {
   '/$handle': typeof HandleRoute
   '/explore': typeof ExploreRoute
   '/onboard': typeof OnboardRoute
+  '/auth/callback': typeof AuthCallbackRoute
   '/dashboard/edit': typeof DashboardEditRoute
   '/dashboard': typeof DashboardIndexRoute
   '/api/public/og/$handle': typeof ApiPublicOgHandleRoute
@@ -85,6 +93,7 @@ export interface FileRoutesById {
   '/dashboard': typeof DashboardRouteWithChildren
   '/explore': typeof ExploreRoute
   '/onboard': typeof OnboardRoute
+  '/auth/callback': typeof AuthCallbackRoute
   '/dashboard/edit': typeof DashboardEditRoute
   '/dashboard/': typeof DashboardIndexRoute
   '/api/public/og/$handle': typeof ApiPublicOgHandleRoute
@@ -97,6 +106,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/explore'
     | '/onboard'
+    | '/auth/callback'
     | '/dashboard/edit'
     | '/dashboard/'
     | '/api/public/og/$handle'
@@ -106,6 +116,7 @@ export interface FileRouteTypes {
     | '/$handle'
     | '/explore'
     | '/onboard'
+    | '/auth/callback'
     | '/dashboard/edit'
     | '/dashboard'
     | '/api/public/og/$handle'
@@ -116,6 +127,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/explore'
     | '/onboard'
+    | '/auth/callback'
     | '/dashboard/edit'
     | '/dashboard/'
     | '/api/public/og/$handle'
@@ -127,6 +139,7 @@ export interface RootRouteChildren {
   DashboardRoute: typeof DashboardRouteWithChildren
   ExploreRoute: typeof ExploreRoute
   OnboardRoute: typeof OnboardRoute
+  AuthCallbackRoute: typeof AuthCallbackRoute
   ApiPublicOgHandleRoute: typeof ApiPublicOgHandleRoute
 }
 
@@ -181,6 +194,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardEditRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/auth/callback': {
+      id: '/auth/callback'
+      path: '/auth/callback'
+      fullPath: '/auth/callback'
+      preLoaderRoute: typeof AuthCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/og/$handle': {
       id: '/api/public/og/$handle'
       path: '/api/public/og/$handle'
@@ -211,6 +231,7 @@ const rootRouteChildren: RootRouteChildren = {
   DashboardRoute: DashboardRouteWithChildren,
   ExploreRoute: ExploreRoute,
   OnboardRoute: OnboardRoute,
+  AuthCallbackRoute: AuthCallbackRoute,
   ApiPublicOgHandleRoute: ApiPublicOgHandleRoute,
 }
 export const routeTree = rootRouteImport

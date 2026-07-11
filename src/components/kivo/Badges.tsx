@@ -1,4 +1,4 @@
-import { chainById, tokenById } from "@/lib/mock/chains";
+import { chainById, tokenById } from "@/lib/fyora/chains";
 
 export function ChainBadge({ id, size = "md" }: { id: string; size?: "sm" | "md" }) {
   const c = chainById(id);
