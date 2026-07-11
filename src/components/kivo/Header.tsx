@@ -1,8 +1,9 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { EmojiAvatar } from "./EmojiAvatar";
 import { BrandLink } from "./Logo";
-import { useKivo } from "@/lib/mock/store";
-import { useHydrated } from "@/lib/mock/useHydrated";
+import { useMagic } from "@/lib/fyora/MagicProvider";
+import { getMyCreatorFn } from "@/lib/fyora/server-functions";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,13 +16,22 @@ import { Eye, LayoutDashboard, LogOut, Link2, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 
 export function Header() {
-  const hydrated = useHydrated();
-  const current = useKivo((s) => (s.currentHandle ? s.creators[s.currentHandle] : undefined));
-  const disconnect = useKivo((s) => s.disconnect);
+  const { identity, loading, refreshIdentity, signOut } = useMagic();
+  const queryClient = useQueryClient();
+  const { data: current } = useQuery({
+    queryKey: ["creator", identity?.issuer],
+    queryFn: async () => {
+      const currentIdentity = await refreshIdentity();
+      return getMyCreatorFn({ data: { didToken: currentIdentity.didToken } });
+    },
+    enabled: Boolean(identity),
+    retry: false,
+  });
   const navigate = useNavigate();
 
-  const handleDisconnect = () => {
-    disconnect();
+  const handleDisconnect = async () => {
+    await signOut();
+    queryClient.clear();
     toast("Disconnected", { icon: "👋", description: "Wallet & session cleared." });
     navigate({ to: "/" });
   };
@@ -40,7 +50,7 @@ export function Header() {
             Explore
           </Link>
 
-          {hydrated && current ? (
+          {!loading && current ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button className="ml-1 sm:ml-2 flex items-center gap-2 rounded-full bg-card chunky shadow-sticker-sm pl-1 pr-2 sm:pr-3 py-1 press min-w-0">
