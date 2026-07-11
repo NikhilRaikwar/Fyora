@@ -34,3 +34,5 @@ dist-ssr
 # Lovable
 .lovable/
 
+# Local agent tooling
+.agents/skills/
