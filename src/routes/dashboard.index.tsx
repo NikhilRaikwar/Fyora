@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { Header } from "@/components/kivo/Header";
 import { EmojiAvatar } from "@/components/kivo/EmojiAvatar";
 import { ChainBadge, TokenBadge } from "@/components/kivo/Badges";
@@ -20,7 +20,7 @@ import {
   Share2,
 } from "lucide-react";
 import { toast } from "sonner";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 export const Route = createFileRoute("/dashboard/")({
   head: () => ({
@@ -37,6 +37,14 @@ export const Route = createFileRoute("/dashboard/")({
 function Dashboard() {
   const { creator, identity, loading, isLoading, refetch } = useCurrentCreator();
   const [cardNonce, setCardNonce] = useState<number | null>(null);
+  const [isCardLoading, setIsCardLoading] = useState(false);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!loading && !identity) {
+      navigate({ to: "/", replace: true });
+    }
+  }, [loading, identity, navigate]);
 
   const stats = useMemo(() => {
     if (!creator) return { total: 0, count: 0, avg: 0, topChain: "arbitrum", week: [] as number[] };
@@ -277,21 +285,40 @@ function Dashboard() {
             </div>
             <button
               type="button"
-              onClick={() => setCardNonce(Date.now())}
-              className="inline-flex items-center gap-2 rounded-full bg-lime chunky shadow-sticker px-4 py-2 text-sm font-semibold press"
+              onClick={() => {
+                setIsCardLoading(true);
+                setCardNonce(Date.now());
+              }}
+              disabled={isCardLoading}
+              className="inline-flex items-center gap-2 rounded-full bg-lime chunky shadow-sticker px-4 py-2 text-sm font-semibold press disabled:opacity-50"
             >
-              {cardNonce ? <RefreshCw className="h-4 w-4" /> : <ImageIcon className="h-4 w-4" />}
-              {cardNonce ? "Regenerate" : "Generate my card"}
+              {isCardLoading ? (
+                <RefreshCw className="h-4 w-4 animate-spin" />
+              ) : cardNonce ? (
+                <RefreshCw className="h-4 w-4" />
+              ) : (
+                <ImageIcon className="h-4 w-4" />
+              )}
+              {isCardLoading ? "Generating..." : cardNonce ? "Regenerate" : "Generate my card"}
             </button>
           </div>
 
           {cardNonce && (
             <div className="mt-5">
-              <div className="overflow-hidden rounded-xl chunky-thick bg-paper shadow-sticker-lg">
+              <div className="overflow-hidden rounded-xl chunky-thick bg-paper shadow-sticker-lg relative min-h-[150px] flex items-center justify-center">
+                {isCardLoading && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-paper/60 z-10">
+                    <RefreshCw className="h-8 w-8 animate-spin text-ink" />
+                  </div>
+                )}
                 <img
                   src={cardUrl}
                   alt={`Fyora share card for ${creator.name}`}
-                  className="block aspect-[40/21] w-full object-cover"
+                  onLoad={() => setIsCardLoading(false)}
+                  onError={() => setIsCardLoading(false)}
+                  className={`block aspect-[40/21] w-full object-cover transition-opacity duration-200 ${
+                    isCardLoading ? "opacity-30" : "opacity-100"
+                  }`}
                 />
               </div>
               <div className="mt-4 flex flex-wrap gap-2">

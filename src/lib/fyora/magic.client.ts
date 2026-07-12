@@ -74,7 +74,6 @@ export async function loginWithGoogle() {
   await getMagicClient().oauth2.loginWithRedirect({
     provider: "google",
     redirectURI,
-    scope: ["user:email"],
   });
 }
 

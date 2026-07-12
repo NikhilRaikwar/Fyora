@@ -1,6 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import resvgWasmUrl from "@resvg/resvg-wasm/index_bg.wasm?url";
 import React from "react";
+import fs from "node:fs";
+import path from "node:path";
 
 const WIDTH = 1200;
 const HEIGHT = 630;
@@ -92,10 +94,23 @@ async function loadCreator(handle: string) {
 async function loadFonts(requestUrl: string): Promise<SatoriFont[]> {
   if (fontsPromise) return fontsPromise;
   fontsPromise = Promise.all(
-    FONT_PATHS.map(async ([name, path, weight, style]) => {
-      const response = await fetch(new URL(path, requestUrl));
-      if (!response.ok) throw new Error(`Could not load ${name} (${response.status}).`);
-      return { name, data: await response.arrayBuffer(), weight, style };
+    FONT_PATHS.map(async ([name, relativePath, weight, style]) => {
+      let bytes: ArrayBuffer;
+      try {
+        if (typeof process !== "undefined" && process.cwd) {
+          const fontPath = path.join(process.cwd(), "public", relativePath);
+          const buffer = fs.readFileSync(fontPath);
+          bytes = buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
+        } else {
+          throw new Error("fs not available");
+        }
+      } catch {
+        const targetUrl = new URL(relativePath, requestUrl).toString();
+        const response = await fetch(targetUrl);
+        if (!response.ok) throw new Error(`Could not load ${name} (${response.status}) from ${targetUrl}`);
+        bytes = await response.arrayBuffer();
+      }
+      return { name, data: bytes, weight, style };
     }),
   );
   return fontsPromise;
@@ -105,9 +120,21 @@ async function initializeResvg(requestUrl: string) {
   if (resvgPromise) return resvgPromise;
   resvgPromise = (async () => {
     const { initWasm } = await import("@resvg/resvg-wasm");
-    const response = await fetch(new URL(resvgWasmUrl, requestUrl));
-    if (!response.ok) throw new Error(`Could not load resvg WASM (${response.status}).`);
-    const bytes = await response.arrayBuffer();
+    let bytes: ArrayBuffer;
+    try {
+      if (typeof process !== "undefined" && process.cwd) {
+        const wasmPath = path.join(process.cwd(), "node_modules", "@resvg", "resvg-wasm", "index_bg.wasm");
+        const buffer = fs.readFileSync(wasmPath);
+        bytes = buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
+      } else {
+        throw new Error("fs not available");
+      }
+    } catch {
+      const targetUrl = resvgWasmUrl.startsWith("http") ? resvgWasmUrl : new URL(resvgWasmUrl, requestUrl).toString();
+      const response = await fetch(targetUrl);
+      if (!response.ok) throw new Error(`Could not load resvg WASM (${response.status}) from ${targetUrl}`);
+      bytes = await response.arrayBuffer();
+    }
     try {
       await initWasm(bytes);
     } catch (error) {
@@ -143,20 +170,21 @@ async function loadEmoji(emoji: string) {
 }
 
 async function renderPng(input: CardInput, requestUrl: string) {
-  const [{ default: satori }, fonts, emoji, { Resvg }] = await Promise.all([
+  const [{ default: satori }, fonts, emoji, brandingEmoji, { Resvg }] = await Promise.all([
     import("satori"),
     loadFonts(requestUrl),
     loadEmoji(input.emoji),
+    loadEmoji("✨"),
     (async () => {
       await initializeResvg(requestUrl);
       return import("@resvg/resvg-wasm");
     })(),
   ]);
-  const svg = await satori(buildCard(input, emoji), { width: WIDTH, height: HEIGHT, fonts });
+  const svg = await satori(buildCard(input, emoji, brandingEmoji), { width: WIDTH, height: HEIGHT, fonts });
   return new Resvg(svg, { fitTo: { mode: "width", value: WIDTH } }).render().asPng();
 }
 
-function buildCard(input: CardInput, emojiUrl: string | null) {
+function buildCard(input: CardInput, emojiUrl: string | null, brandingEmojiUrl: string | null) {
   const h = React.createElement;
   const [g0, g1] = input.gradient;
   const nameSize = input.name.length <= 18 ? 78 : input.name.length <= 30 ? 62 : 48;
@@ -249,12 +277,12 @@ function buildCard(input: CardInput, emojiUrl: string | null) {
               justifyContent: "center",
               alignItems: "center",
               overflow: "hidden",
-              borderRadius: 44,
+              borderRadius: 999,
               background: `linear-gradient(135deg, ${g0}, ${g1})`,
             },
           },
           emojiUrl
-            ? h("img", { src: emojiUrl, width: 142, height: 142, style: { objectFit: "contain" } })
+            ? h("img", { src: emojiUrl, width: 130, height: 130, style: { objectFit: "contain" } })
             : h(
                 "div",
                 {
@@ -376,18 +404,17 @@ function buildCard(input: CardInput, emojiUrl: string | null) {
       },
       "$",
     ),
-    h("div", {
+    brandingEmojiUrl && h("img", {
+      src: brandingEmojiUrl,
+      width: 54,
+      height: 54,
       style: {
         position: "absolute",
         right: 48,
         top: 255,
         display: "flex",
-        color: "#FFD166",
-        fontFamily: "DM Sans",
-        fontSize: 42,
-        textShadow: `2px 2px 0 ${INK}`,
+        transform: "rotate(-10deg)",
       },
-      children: "✦",
     }),
   );
 }

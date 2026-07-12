@@ -65,7 +65,11 @@ export function MagicProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signOut = useCallback(async () => {
-    await (await getClientApi()).logoutMagic();
+    try {
+      await (await getClientApi()).logoutMagic();
+    } catch (error) {
+      console.error("Magic logout failed:", error);
+    }
     setIdentity(null);
   }, []);
 

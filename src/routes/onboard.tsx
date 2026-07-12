@@ -1,6 +1,6 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { z } from "zod";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import confetti from "canvas-confetti";
 import { QRCodeSVG } from "qrcode.react";
@@ -9,7 +9,7 @@ import { EmojiAvatar } from "@/components/kivo/EmojiAvatar";
 import { Sticker } from "@/components/kivo/Sticker";
 import { CopyButton } from "@/components/kivo/CopyButton";
 import { MagicLoginCard } from "@/components/kivo/MagicLoginCard";
-import { useMagic } from "@/lib/fyora/MagicProvider";
+import { useCurrentCreator } from "@/lib/fyora/hooks";
 import { claimCreatorFn, getPublicCreatorFn } from "@/lib/fyora/server-functions";
 import {
   DEFAULT_SETTLEMENT,
@@ -67,8 +67,15 @@ const GRADIENTS: [string, string][] = [
 
 function Onboard() {
   const { h } = Route.useSearch();
-  const { identity, loading, refreshIdentity } = useMagic();
+  const { identity, loading, isLoading, creator, refreshIdentity } = useCurrentCreator();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (identity && creator) {
+      navigate({ to: "/dashboard", replace: true });
+    }
+  }, [identity, creator, navigate]);
 
   const [step, setStep] = useState(0);
   const [handle, setHandle] = useState(h ?? "");
@@ -147,7 +154,7 @@ function Onboard() {
     }
   };
 
-  if (loading)
+  if (loading || (identity && isLoading))
     return (
       <div className="min-h-screen bg-paper">
         <Header />

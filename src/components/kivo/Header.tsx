@@ -38,7 +38,11 @@ export function Header() {
   const navigate = useNavigate();
 
   const handleDisconnect = async () => {
-    await signOut();
+    try {
+      await signOut();
+    } catch (error) {
+      console.error("Disconnect failed:", error);
+    }
     queryClient.clear();
     toast("Disconnected", { icon: "👋", description: "Wallet & session cleared." });
     navigate({ to: "/" });

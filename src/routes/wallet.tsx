@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import type { IAssetsResponse, ITransaction } from "@particle-network/universal-account-sdk";
 import { isAddress } from "ethers";
@@ -13,7 +13,7 @@ import {
   ShieldCheck,
   WalletCards,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { toast } from "sonner";
 import { Header } from "@/components/kivo/Header";
@@ -102,6 +102,14 @@ function shortAddress(value: string) {
 
 function WalletCenter() {
   const { identity, loading } = useMagic();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!loading && !identity) {
+      navigate({ to: "/", replace: true });
+    }
+  }, [loading, identity, navigate]);
+
   const [receiveNetwork, setReceiveNetwork] = useState<"evm" | "solana">("evm");
   const [tokenId, setTokenId] = useState<(typeof TOKEN_IDS)[number]>("usdc");
   const [chainId, setChainId] = useState(8453);
