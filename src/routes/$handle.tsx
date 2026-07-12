@@ -21,13 +21,11 @@ export const Route = createFileRoute("/$handle")({
       return null;
     }
   },
-  head: ({ params }) => {
-    const baseUrl = typeof window !== "undefined" ? window.location.origin : "https://fyora.app";
+  head: ({ params, loaderData }) => {
+    const baseUrl = "https://www.fyora.app";
     const handle = (params.handle ?? "").toLowerCase();
-    const ogImage =
-      handle === "nikhil"
-        ? `${baseUrl}/fyora-share-nikhil.jpg`
-        : `${baseUrl}/fyora-share-default.jpg`;
+    const version = loaderData?.updatedAt ?? 1;
+    const ogImage = `${baseUrl}/api/public/og/${encodeURIComponent(handle)}.png?v=${version}`;
     return {
       meta: [
         { title: `Support @${params.handle} on Fyora` },
@@ -40,12 +38,16 @@ export const Route = createFileRoute("/$handle")({
         { property: "og:url", content: `${baseUrl}/${params.handle}` },
         { property: "og:type", content: "profile" },
         { property: "og:image", content: ogImage },
+        { property: "og:image:secure_url", content: ogImage },
+        { property: "og:image:type", content: "image/png" },
         { property: "og:image:width", content: "1200" },
         { property: "og:image:height", content: "630" },
+        { property: "og:image:alt", content: `Fyora payment card for @${handle}` },
         { name: "twitter:card", content: "summary_large_image" },
         { name: "twitter:image", content: ogImage },
+        { name: "twitter:image:alt", content: `Fyora payment card for @${handle}` },
       ],
-      links: [{ rel: "canonical", href: `${baseUrl}/${params.handle}` }],
+      links: [{ rel: "canonical", href: `${baseUrl}/${handle}` }],
     };
   },
   component: Public,

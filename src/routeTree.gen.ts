@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as WalletRouteImport } from './routes/wallet'
 import { Route as OnboardRouteImport } from './routes/onboard'
 import { Route as ExploreRouteImport } from './routes/explore'
 import { Route as DashboardRouteImport } from './routes/dashboard'
@@ -19,6 +20,11 @@ import { Route as DashboardEditRouteImport } from './routes/dashboard.edit'
 import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
 import { Route as ApiPublicOgHandleRouteImport } from './routes/api/public/og.$handle'
 
+const WalletRoute = WalletRouteImport.update({
+  id: '/wallet',
+  path: '/wallet',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const OnboardRoute = OnboardRouteImport.update({
   id: '/onboard',
   path: '/onboard',
@@ -71,6 +77,7 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof DashboardRouteWithChildren
   '/explore': typeof ExploreRoute
   '/onboard': typeof OnboardRoute
+  '/wallet': typeof WalletRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/dashboard/edit': typeof DashboardEditRoute
   '/dashboard/': typeof DashboardIndexRoute
@@ -81,6 +88,7 @@ export interface FileRoutesByTo {
   '/$handle': typeof HandleRoute
   '/explore': typeof ExploreRoute
   '/onboard': typeof OnboardRoute
+  '/wallet': typeof WalletRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/dashboard/edit': typeof DashboardEditRoute
   '/dashboard': typeof DashboardIndexRoute
@@ -93,6 +101,7 @@ export interface FileRoutesById {
   '/dashboard': typeof DashboardRouteWithChildren
   '/explore': typeof ExploreRoute
   '/onboard': typeof OnboardRoute
+  '/wallet': typeof WalletRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/dashboard/edit': typeof DashboardEditRoute
   '/dashboard/': typeof DashboardIndexRoute
@@ -106,6 +115,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/explore'
     | '/onboard'
+    | '/wallet'
     | '/auth/callback'
     | '/dashboard/edit'
     | '/dashboard/'
@@ -116,6 +126,7 @@ export interface FileRouteTypes {
     | '/$handle'
     | '/explore'
     | '/onboard'
+    | '/wallet'
     | '/auth/callback'
     | '/dashboard/edit'
     | '/dashboard'
@@ -127,6 +138,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/explore'
     | '/onboard'
+    | '/wallet'
     | '/auth/callback'
     | '/dashboard/edit'
     | '/dashboard/'
@@ -139,12 +151,20 @@ export interface RootRouteChildren {
   DashboardRoute: typeof DashboardRouteWithChildren
   ExploreRoute: typeof ExploreRoute
   OnboardRoute: typeof OnboardRoute
+  WalletRoute: typeof WalletRoute
   AuthCallbackRoute: typeof AuthCallbackRoute
   ApiPublicOgHandleRoute: typeof ApiPublicOgHandleRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/wallet': {
+      id: '/wallet'
+      path: '/wallet'
+      fullPath: '/wallet'
+      preLoaderRoute: typeof WalletRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/onboard': {
       id: '/onboard'
       path: '/onboard'
@@ -231,6 +251,7 @@ const rootRouteChildren: RootRouteChildren = {
   DashboardRoute: DashboardRouteWithChildren,
   ExploreRoute: ExploreRoute,
   OnboardRoute: OnboardRoute,
+  WalletRoute: WalletRoute,
   AuthCallbackRoute: AuthCallbackRoute,
   ApiPublicOgHandleRoute: ApiPublicOgHandleRoute,
 }

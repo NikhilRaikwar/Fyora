@@ -72,7 +72,8 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   head: () => {
-    const baseUrl = typeof window !== "undefined" ? window.location.origin : "https://fyora.app";
+    const baseUrl = "https://www.fyora.app";
+    const ogImage = `${baseUrl}/api/public/og/fyora.png?v=1`;
     return {
       meta: [
         { charSet: "utf-8" },
@@ -90,11 +91,15 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
           content: "One link. Any chain. Instant support for creators.",
         },
         { property: "og:type", content: "website" },
-        { property: "og:image", content: `${baseUrl}/fyora-share-default.jpg` },
+        { property: "og:image", content: ogImage },
+        { property: "og:image:secure_url", content: ogImage },
+        { property: "og:image:type", content: "image/png" },
         { property: "og:image:width", content: "1200" },
         { property: "og:image:height", content: "630" },
+        { property: "og:image:alt", content: "Fyora — get paid from any chain" },
         { name: "twitter:card", content: "summary_large_image" },
-        { name: "twitter:image", content: `${baseUrl}/fyora-share-default.jpg` },
+        { name: "twitter:image", content: ogImage },
+        { name: "twitter:image:alt", content: "Fyora — get paid from any chain" },
       ],
       links: [
         { rel: "stylesheet", href: appCss },

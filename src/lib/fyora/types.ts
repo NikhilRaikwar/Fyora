@@ -31,6 +31,7 @@ export type Settlement = {
 
 export type Creator = {
   profileId: string;
+  updatedAt: number;
   handle: string;
   name: string;
   bio: string;

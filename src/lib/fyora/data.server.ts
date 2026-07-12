@@ -69,6 +69,7 @@ function mapCreator(
 ): Creator {
   return {
     profileId: profile.id,
+    updatedAt: Date.parse(profile.updated_at),
     handle: profile.handle,
     name: profile.display_name,
     bio: profile.bio,

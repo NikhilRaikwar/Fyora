@@ -10,9 +10,17 @@ import { QRCodeSVG } from "qrcode.react";
 import { MagicLoginCard } from "@/components/kivo/MagicLoginCard";
 import { useCurrentCreator } from "@/lib/fyora/hooks";
 import { chainById } from "@/lib/fyora/chains";
-import { ExternalLink, Eye, Pencil, RefreshCw } from "lucide-react";
+import {
+  Download,
+  ExternalLink,
+  Eye,
+  Image as ImageIcon,
+  Pencil,
+  RefreshCw,
+  Share2,
+} from "lucide-react";
 import { toast } from "sonner";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 
 export const Route = createFileRoute("/dashboard/")({
   head: () => ({
@@ -28,6 +36,7 @@ export const Route = createFileRoute("/dashboard/")({
 
 function Dashboard() {
   const { creator, identity, loading, isLoading, refetch } = useCurrentCreator();
+  const [cardNonce, setCardNonce] = useState<number | null>(null);
 
   const stats = useMemo(() => {
     if (!creator) return { total: 0, count: 0, avg: 0, topChain: "arbitrum", week: [] as number[] };
@@ -88,8 +97,42 @@ function Dashboard() {
     );
   }
 
-  const shareUrl = `https://fyora.app/${creator.handle}`;
+  const shareUrl = `https://www.fyora.app/${creator.handle}`;
+  const cardUrl = `/api/public/og/${creator.handle}.png?v=${creator.updatedAt}${cardNonce ? `&preview=${cardNonce}` : ""}`;
   const max = Math.max(...stats.week, 1);
+
+  const sharePage = async () => {
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: `${creator.name} on Fyora`,
+          text: `Support ${creator.name} from any chain.`,
+          url: shareUrl,
+        });
+        return;
+      }
+      await navigator.clipboard.writeText(shareUrl);
+      toast.success("Link copied");
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      toast.error("Could not share this page");
+    }
+  };
+
+  const downloadCard = async () => {
+    try {
+      const response = await fetch(cardUrl);
+      if (!response.ok) throw new Error("Card download failed");
+      const objectUrl = URL.createObjectURL(await response.blob());
+      const anchor = document.createElement("a");
+      anchor.href = objectUrl;
+      anchor.download = `fyora-${creator.handle}.png`;
+      anchor.click();
+      URL.revokeObjectURL(objectUrl);
+    } catch {
+      toast.error("Could not download your card");
+    }
+  };
 
   return (
     <div className="min-h-screen bg-paper text-ink">
@@ -189,10 +232,10 @@ function Dashboard() {
                 <div className="mt-2 flex flex-wrap gap-2">
                   <CopyButton value={shareUrl} label="Copy link" />
                   <button
-                    onClick={() => toast("Shared!", { icon: "🚀" })}
+                    onClick={sharePage}
                     className="inline-flex items-center gap-1 rounded-full bg-card chunky shadow-sticker-sm px-3 py-1.5 text-sm font-semibold press"
                   >
-                    Share
+                    <Share2 className="h-3.5 w-3.5" /> Share
                   </button>
                 </div>
               </div>
@@ -222,6 +265,58 @@ function Dashboard() {
             </span>
           </div>
         </div>
+
+        {/* Share card */}
+        <section className="mt-6 rounded-3xl bg-card chunky-thick shadow-sticker-lg p-6">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="font-display italic text-2xl sm:text-3xl">Your share card</h2>
+              <p className="text-sm text-muted-foreground">
+                This is what people see when you share your link.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setCardNonce(Date.now())}
+              className="inline-flex items-center gap-2 rounded-full bg-lime chunky shadow-sticker px-4 py-2 text-sm font-semibold press"
+            >
+              {cardNonce ? <RefreshCw className="h-4 w-4" /> : <ImageIcon className="h-4 w-4" />}
+              {cardNonce ? "Regenerate" : "Generate my card"}
+            </button>
+          </div>
+
+          {cardNonce && (
+            <div className="mt-5">
+              <div className="overflow-hidden rounded-xl chunky-thick bg-paper shadow-sticker-lg">
+                <img
+                  src={cardUrl}
+                  alt={`Fyora share card for ${creator.name}`}
+                  className="block aspect-[40/21] w-full object-cover"
+                />
+              </div>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={downloadCard}
+                  className="inline-flex items-center gap-2 rounded-full bg-ink px-4 py-2 text-sm font-semibold text-paper chunky shadow-sticker press"
+                >
+                  <Download className="h-4 w-4" /> Download PNG
+                </button>
+                <button
+                  type="button"
+                  onClick={sharePage}
+                  className="inline-flex items-center gap-2 rounded-full bg-card px-4 py-2 text-sm font-semibold chunky shadow-sticker-sm press"
+                >
+                  <Share2 className="h-4 w-4" /> Share
+                </button>
+                <CopyButton value={shareUrl} label="Copy link" />
+              </div>
+              <p className="mt-3 text-xs text-muted-foreground">
+                Social apps may keep an older preview for a while after you update your page.
+              </p>
+            </div>
+          )}
+        </section>
 
         {/* Payments table */}
         <div className="mt-6 rounded-3xl bg-card chunky-thick shadow-sticker-lg p-6">
