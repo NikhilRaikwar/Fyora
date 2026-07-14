@@ -1,4 +1,4 @@
-import { createFileRoute, Link, notFound } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { Header } from "@/components/kivo/Header";
 import { EmojiAvatar } from "@/components/kivo/EmojiAvatar";
 import { ChainBadge, TokenBadge } from "@/components/kivo/Badges";
@@ -7,20 +7,25 @@ import { Odometer } from "@/components/kivo/Odometer";
 import { CopyButton } from "@/components/kivo/CopyButton";
 import { WigglyDivider } from "@/components/kivo/WigglyDivider";
 import { PaymentSheet } from "@/components/kivo/PaymentSheet";
-import { useCreator, useKivo } from "@/lib/mock/store";
-import { useHydrated } from "@/lib/mock/useHydrated";
+import { getPublicCreatorFn } from "@/lib/fyora/server-functions";
 import { useState } from "react";
 import { motion } from "motion/react";
 import { Github, Globe, Youtube, Instagram, ArrowRight, Heart } from "lucide-react";
 import { HandleUrl } from "@/components/kivo/Logo";
 
 export const Route = createFileRoute("/$handle")({
-  head: ({ params }) => {
-    const baseUrl = typeof window !== "undefined" ? window.location.origin : "https://fyora.app";
+  loader: async ({ params }) => {
+    try {
+      return await getPublicCreatorFn({ data: { handle: params.handle } });
+    } catch {
+      return null;
+    }
+  },
+  head: ({ params, loaderData }) => {
+    const baseUrl = "https://www.fyora.app";
     const handle = (params.handle ?? "").toLowerCase();
-    const ogImage = handle === "nikhil"
-      ? `${baseUrl}/fyora-share-nikhil.jpg`
-      : `${baseUrl}/fyora-share-default.jpg`;
+    const version = loaderData?.updatedAt ?? 1;
+    const ogImage = `${baseUrl}/api/public/og/${encodeURIComponent(handle)}.png?v=${version}`;
     return {
       meta: [
         { title: `Support @${params.handle} on Fyora` },
@@ -33,18 +38,22 @@ export const Route = createFileRoute("/$handle")({
         { property: "og:url", content: `${baseUrl}/${params.handle}` },
         { property: "og:type", content: "profile" },
         { property: "og:image", content: ogImage },
+        { property: "og:image:secure_url", content: ogImage },
+        { property: "og:image:type", content: "image/png" },
         { property: "og:image:width", content: "1200" },
         { property: "og:image:height", content: "630" },
+        { property: "og:image:alt", content: `Fyora payment card for @${handle}` },
         { name: "twitter:card", content: "summary_large_image" },
         { name: "twitter:image", content: ogImage },
+        { name: "twitter:image:alt", content: `Fyora payment card for @${handle}` },
       ],
-      links: [{ rel: "canonical", href: `${baseUrl}/${params.handle}` }],
+      links: [{ rel: "canonical", href: `${baseUrl}/${handle}` }],
     };
   },
   component: Public,
 });
 
-const AMOUNTS = [5, 10, 25, 50];
+const AMOUNTS = [0.1, 1, 5, 10];
 
 function socialIcon(kind: string) {
   const cls = "w-4 h-4";
@@ -67,20 +76,11 @@ function fmtAgo(ms: number) {
 
 function Public() {
   const { handle } = Route.useParams();
-  const hydrated = useHydrated();
-  const creator = useCreator(handle);
-  const [amount, setAmount] = useState<number>(10);
+  const creator = Route.useLoaderData();
+  const [amount, setAmount] = useState<number>(0.1);
   const [custom, setCustom] = useState("");
   const [note, setNote] = useState("");
   const [open, setOpen] = useState(false);
-
-  if (!hydrated) {
-    return (
-      <div className="min-h-screen bg-paper">
-        <Header />
-      </div>
-    );
-  }
 
   if (!creator) {
     return (
@@ -104,8 +104,9 @@ function Public() {
     );
   }
 
-  const total = creator.payments.reduce((s, p) => s + p.amountUsd, 0);
-  const finalAmount = custom ? Math.max(1, Math.floor(Number(custom))) || amount : amount;
+  const confirmedPayments = creator.payments.filter((payment) => payment.status === "confirmed");
+  const total = confirmedPayments.reduce((s, p) => s + p.amountUsd, 0);
+  const finalAmount = custom ? Math.max(0.01, Number(Number(custom).toFixed(2))) || amount : amount;
 
   return (
     <div className="min-h-screen bg-paper text-ink">
@@ -126,7 +127,13 @@ function Public() {
             className="rounded-3xl bg-card chunky-thick shadow-sticker-lg p-6 sm:p-8"
           >
             <div className="flex flex-col sm:flex-row items-start gap-5">
-              <EmojiAvatar emoji={creator.emoji} gradient={creator.gradient} size={96} animate />
+              <EmojiAvatar
+                emoji={creator.emoji}
+                gradient={creator.gradient}
+                avatarUrl={creator.avatarUrl}
+                size={96}
+                animate
+              />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <h1 className="font-display italic text-4xl sm:text-5xl leading-none break-words">
@@ -192,7 +199,7 @@ function Public() {
           <div className="mt-3 flex items-center gap-2 bg-secondary chunky rounded-2xl px-4 py-3">
             <span className="text-muted-foreground text-lg">$</span>
             <input
-              inputMode="numeric"
+              inputMode="decimal"
               value={custom}
               onChange={(e) => setCustom(e.target.value.replace(/[^0-9.]/g, ""))}
               placeholder="Custom amount"
@@ -239,7 +246,7 @@ function Public() {
           <div className="rounded-3xl bg-lilac chunky shadow-sticker p-5">
             <div className="text-xs uppercase font-bold tracking-wider">Supporters</div>
             <div className="font-display italic text-3xl sm:text-5xl mt-1 truncate">
-              <Odometer value={creator.payments.length} />
+              <Odometer value={confirmedPayments.length} />
             </div>
           </div>
         </div>

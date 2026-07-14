@@ -7,12 +7,20 @@ import { QRCodeSVG } from "qrcode.react";
 import { Header } from "@/components/kivo/Header";
 import { EmojiAvatar } from "@/components/kivo/EmojiAvatar";
 import { Sticker } from "@/components/kivo/Sticker";
-import { ChainBadge, TokenBadge } from "@/components/kivo/Badges";
 import { CopyButton } from "@/components/kivo/CopyButton";
-import { CHAINS, TOKENS } from "@/lib/mock/chains";
-import { useKivo } from "@/lib/mock/store";
+import { AuthLoginCard } from "@/components/kivo/AuthLoginCard";
+import { useCurrentCreator } from "@/lib/fyora/hooks";
+import { claimCreatorFn, getPublicCreatorFn } from "@/lib/fyora/server-functions";
+import {
+  DEFAULT_SETTLEMENT,
+  SETTLEMENT_CHAINS,
+  settlementAssetsForChain,
+} from "@/lib/fyora/settlement";
+import { loadUniversalAccountAddresses } from "@/lib/fyora/particle";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, Plus, X, ArrowRight, ArrowLeft } from "lucide-react";
-import type { Social } from "@/lib/mock/creators";
+import type { Social } from "@/lib/fyora/types";
+import { toast } from "sonner";
 
 const searchSchema = z.object({ h: z.string().optional() });
 
@@ -60,10 +68,15 @@ const GRADIENTS: [string, string][] = [
 
 function Onboard() {
   const { h } = Route.useSearch();
+  const { identity, loading, isLoading, creator, refreshIdentity } = useCurrentCreator();
+  const queryClient = useQueryClient();
   const navigate = useNavigate();
-  const upsert = useKivo((s) => s.upsertCreator);
-  const setCurrent = useKivo((s) => s.setCurrent);
-  const creators = useKivo((s) => s.creators);
+
+  useEffect(() => {
+    if (identity && creator) {
+      navigate({ to: "/dashboard", replace: true });
+    }
+  }, [identity, creator, navigate]);
 
   const [step, setStep] = useState(0);
   const [handle, setHandle] = useState(h ?? "");
@@ -72,46 +85,100 @@ function Onboard() {
   const [emoji, setEmoji] = useState(EMOJIS[0]);
   const [gradient, setGradient] = useState<[string, string]>(GRADIENTS[0]);
   const [socials, setSocials] = useState<Social[]>([{ kind: "x", url: "" }]);
-  const [chain, setChain] = useState("arbitrum");
-  const [token, setToken] = useState("usdc");
-  const [address, setAddress] = useState("");
+  const [chain, setChain] = useState(DEFAULT_SETTLEMENT.chainSlug);
+  const [token, setToken] = useState(DEFAULT_SETTLEMENT.tokenId);
+  const [publishing, setPublishing] = useState(false);
 
   const cleanHandle = handle
     .trim()
     .toLowerCase()
     .replace(/[^a-z0-9_]/g, "");
-  const taken = !!creators[cleanHandle];
-  const available = cleanHandle.length >= 2 && !taken;
+  const { data: existingHandle, isFetching: checkingHandle } = useQuery({
+    queryKey: ["public-creator", cleanHandle],
+    queryFn: () => getPublicCreatorFn({ data: { handle: cleanHandle } }),
+    enabled: cleanHandle.length >= 3,
+    staleTime: 15_000,
+  });
+  const addressesQuery = useQuery({
+    queryKey: ["particle-ua-addresses", identity?.evmAddress],
+    queryFn: () => loadUniversalAccountAddresses(identity!.evmAddress),
+    enabled: Boolean(identity?.evmAddress),
+    retry: 1,
+  });
+  const selectedChain = SETTLEMENT_CHAINS.find((item) => item.chainSlug === chain)!;
+  const chainAssets = settlementAssetsForChain(selectedChain.chainId);
+  const selectedAsset = chainAssets.find((item) => item.tokenId === token) ?? chainAssets[0];
+  const address =
+    selectedAsset.networkType === "solana"
+      ? (addressesQuery.data?.solanaUaAddress ?? "")
+      : (addressesQuery.data?.evmUaAddress ?? "");
+  const available = cleanHandle.length >= 3 && !checkingHandle && existingHandle === null;
 
   const canNext = useMemo(() => {
     if (step === 0) return available;
     if (step === 1) return name.trim().length > 1;
-    if (step === 2) return address.trim().length > 0;
+    if (step === 2) return address.trim().length > 0 && !addressesQuery.isLoading;
     return true;
-  }, [step, available, name, address]);
+  }, [step, available, name, address, addressesQuery.isLoading]);
 
-  const done = () => {
-    upsert({
-      handle: cleanHandle,
-      name,
-      bio,
-      emoji,
-      gradient,
-      socials: socials.filter((s) => s.url.trim()),
-      settlement: { chain, token, address },
-      payments: [],
-    });
-    setCurrent(cleanHandle);
-    setStep(3);
-    setTimeout(() => {
-      confetti({
-        particleCount: 160,
-        spread: 90,
-        origin: { y: 0.4 },
-        colors: ["#C6F24E", "#FF6B4A", "#B8A6FF", "#FFD166"],
+  const done = async () => {
+    if (!identity || !selectedAsset) return;
+    setPublishing(true);
+    try {
+      const currentIdentity = await refreshIdentity();
+      if (!addressesQuery.data) throw new Error("Universal receive address is still loading.");
+      await claimCreatorFn({
+        data: {
+          didToken: currentIdentity.didToken,
+          handle: cleanHandle,
+          name,
+          bio,
+          emoji,
+          gradient,
+          socials: socials
+            .filter((social) => social.url.trim())
+            .map((social) => ({
+              ...social,
+              url: /^https?:\/\//i.test(social.url) ? social.url : `https://${social.url}`,
+            })),
+          chainId: selectedAsset.chainId,
+          tokenAddress: selectedAsset.tokenAddress,
+          universalAddresses: addressesQuery.data,
+        },
       });
-    }, 200);
+      await queryClient.invalidateQueries();
+      setStep(3);
+      setTimeout(() => {
+        confetti({
+          particleCount: 160,
+          spread: 90,
+          origin: { y: 0.4 },
+          colors: ["#C6F24E", "#FF6B4A", "#B8A6FF", "#FFD166"],
+        });
+      }, 200);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not publish this page.");
+    } finally {
+      setPublishing(false);
+    }
   };
+
+  if (loading || (identity && isLoading))
+    return (
+      <div className="min-h-screen bg-paper">
+        <Header />
+      </div>
+    );
+  if (!identity) {
+    return (
+      <div className="min-h-screen bg-paper text-ink">
+        <Header />
+        <div className="px-4 py-16">
+          <AuthLoginCard title="Sign in to claim your page" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-paper text-ink">
@@ -154,7 +221,7 @@ function Onboard() {
                     placeholder="yourname"
                     className="flex-1 bg-transparent outline-none text-lg font-semibold"
                   />
-                  {cleanHandle.length >= 2 &&
+                  {cleanHandle.length >= 3 &&
                     (available ? (
                       <span className="inline-flex items-center gap-1 text-sm font-semibold text-ink bg-lime chunky rounded-full px-2 py-0.5">
                         <Check className="w-3 h-3" /> free
@@ -295,27 +362,47 @@ function Onboard() {
                     Settlement chain
                   </div>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                    {CHAINS.map((c) => (
-                      <button
-                        type="button"
-                        key={c.id}
-                        onClick={() => setChain(c.id)}
-                        className={`relative rounded-2xl chunky p-3 text-left press ${chain === c.id ? "bg-lime shadow-sticker" : "bg-card shadow-sticker-sm"}`}
-                      >
-                        <div className="flex items-center gap-2">
-                          <div
-                            className="w-6 h-6 rounded-full border border-ink"
-                            style={{ background: c.color }}
-                          />
-                          <div className="font-semibold text-sm">{c.name}</div>
-                        </div>
-                        {c.id === "arbitrum" && (
-                          <span className="absolute -top-2 -right-2 rotate-6 bg-coral text-ink chunky rounded-full px-2 py-0.5 text-[10px] font-bold shadow-sticker-sm">
-                            Recommended
-                          </span>
-                        )}
-                      </button>
-                    ))}
+                    {SETTLEMENT_CHAINS.map((c) => {
+                      const unavailableSolana = Boolean(
+                        c.networkType === "solana" &&
+                        addressesQuery.data &&
+                        !addressesQuery.data.solanaUaAddress,
+                      );
+                      return (
+                        <button
+                          type="button"
+                          key={c.chainId}
+                          disabled={unavailableSolana}
+                          onClick={() => {
+                            if (unavailableSolana) {
+                              toast.error("Solana Universal receive is not available yet.");
+                              return;
+                            }
+                            setChain(c.chainSlug);
+                            setToken(settlementAssetsForChain(c.chainId)[0].tokenId);
+                          }}
+                          className={`relative rounded-2xl chunky p-3 text-left press disabled:opacity-50 ${chain === c.chainSlug ? "bg-lime shadow-sticker" : "bg-card shadow-sticker-sm"}`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <div
+                              className="w-6 h-6 rounded-full border border-ink"
+                              style={{ background: c.chainColor }}
+                            />
+                            <div className="font-semibold text-sm">{c.chainName}</div>
+                          </div>
+                          {unavailableSolana && (
+                            <div className="mt-1 text-[10px] text-muted-foreground">
+                              Universal receive unavailable
+                            </div>
+                          )}
+                          {c.chainSlug === "arbitrum" && (
+                            <span className="absolute -top-2 -right-2 rotate-6 bg-coral text-ink chunky rounded-full px-2 py-0.5 text-[10px] font-bold shadow-sticker-sm">
+                              Recommended
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 
@@ -324,14 +411,14 @@ function Onboard() {
                     Token
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    {TOKENS.map((t) => (
+                    {chainAssets.map((t) => (
                       <button
                         type="button"
-                        key={t.id}
-                        onClick={() => setToken(t.id)}
-                        className={`rounded-full chunky px-4 py-2 press font-semibold ${token === t.id ? "bg-lime shadow-sticker" : "bg-card shadow-sticker-sm"}`}
+                        key={t.tokenAddress}
+                        onClick={() => setToken(t.tokenId)}
+                        className={`rounded-full chunky px-4 py-2 press font-semibold ${token === t.tokenId ? "bg-lime shadow-sticker" : "bg-card shadow-sticker-sm"}`}
                       >
-                        {t.emoji} {t.symbol}
+                        {t.tokenEmoji} {t.tokenSymbol}
                       </button>
                     ))}
                   </div>
@@ -344,18 +431,16 @@ function Onboard() {
                   <div className="flex gap-2">
                     <input
                       value={address}
-                      onChange={(e) => setAddress(e.target.value)}
-                      placeholder="0x…"
+                      readOnly
+                      placeholder="Universal receive address"
                       className="flex-1 bg-secondary chunky rounded-2xl px-4 py-3 outline-none font-mono text-sm"
                     />
-                    <button
-                      type="button"
-                      onClick={() => setAddress("0x8f3aC0f0b2De8f81A2eB19f4Ac821E4D42b")}
-                      className="rounded-2xl bg-card chunky shadow-sticker-sm px-4 press font-semibold"
-                    >
-                      Demo
-                    </button>
                   </div>
+                  {addressesQuery.isError && (
+                    <p className="mt-2 text-xs text-destructive">
+                      Could not load Universal receive address. Refresh and try again.
+                    </p>
+                  )}
                 </div>
               </StepBox>
             )}
@@ -441,7 +526,7 @@ function Onboard() {
               ) : (
                 <button
                   onClick={done}
-                  disabled={!canNext}
+                  disabled={!canNext || publishing}
                   className="inline-flex items-center gap-1 rounded-full bg-lime text-ink chunky shadow-sticker px-5 py-2.5 font-semibold press disabled:opacity-40"
                 >
                   Publish page ✨

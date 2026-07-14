@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as WalletRouteImport } from './routes/wallet'
 import { Route as OnboardRouteImport } from './routes/onboard'
 import { Route as ExploreRouteImport } from './routes/explore'
 import { Route as DashboardRouteImport } from './routes/dashboard'
@@ -18,6 +19,11 @@ import { Route as DashboardIndexRouteImport } from './routes/dashboard.index'
 import { Route as DashboardEditRouteImport } from './routes/dashboard.edit'
 import { Route as ApiPublicOgHandleRouteImport } from './routes/api/public/og.$handle'
 
+const WalletRoute = WalletRouteImport.update({
+  id: '/wallet',
+  path: '/wallet',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const OnboardRoute = OnboardRouteImport.update({
   id: '/onboard',
   path: '/onboard',
@@ -65,6 +71,7 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof DashboardRouteWithChildren
   '/explore': typeof ExploreRoute
   '/onboard': typeof OnboardRoute
+  '/wallet': typeof WalletRoute
   '/dashboard/edit': typeof DashboardEditRoute
   '/dashboard/': typeof DashboardIndexRoute
   '/api/public/og/$handle': typeof ApiPublicOgHandleRoute
@@ -74,6 +81,7 @@ export interface FileRoutesByTo {
   '/$handle': typeof HandleRoute
   '/explore': typeof ExploreRoute
   '/onboard': typeof OnboardRoute
+  '/wallet': typeof WalletRoute
   '/dashboard/edit': typeof DashboardEditRoute
   '/dashboard': typeof DashboardIndexRoute
   '/api/public/og/$handle': typeof ApiPublicOgHandleRoute
@@ -85,6 +93,7 @@ export interface FileRoutesById {
   '/dashboard': typeof DashboardRouteWithChildren
   '/explore': typeof ExploreRoute
   '/onboard': typeof OnboardRoute
+  '/wallet': typeof WalletRoute
   '/dashboard/edit': typeof DashboardEditRoute
   '/dashboard/': typeof DashboardIndexRoute
   '/api/public/og/$handle': typeof ApiPublicOgHandleRoute
@@ -97,6 +106,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/explore'
     | '/onboard'
+    | '/wallet'
     | '/dashboard/edit'
     | '/dashboard/'
     | '/api/public/og/$handle'
@@ -106,6 +116,7 @@ export interface FileRouteTypes {
     | '/$handle'
     | '/explore'
     | '/onboard'
+    | '/wallet'
     | '/dashboard/edit'
     | '/dashboard'
     | '/api/public/og/$handle'
@@ -116,6 +127,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/explore'
     | '/onboard'
+    | '/wallet'
     | '/dashboard/edit'
     | '/dashboard/'
     | '/api/public/og/$handle'
@@ -127,11 +139,19 @@ export interface RootRouteChildren {
   DashboardRoute: typeof DashboardRouteWithChildren
   ExploreRoute: typeof ExploreRoute
   OnboardRoute: typeof OnboardRoute
+  WalletRoute: typeof WalletRoute
   ApiPublicOgHandleRoute: typeof ApiPublicOgHandleRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/wallet': {
+      id: '/wallet'
+      path: '/wallet'
+      fullPath: '/wallet'
+      preLoaderRoute: typeof WalletRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/onboard': {
       id: '/onboard'
       path: '/onboard'
@@ -211,6 +231,7 @@ const rootRouteChildren: RootRouteChildren = {
   DashboardRoute: DashboardRouteWithChildren,
   ExploreRoute: ExploreRoute,
   OnboardRoute: OnboardRoute,
+  WalletRoute: WalletRoute,
   ApiPublicOgHandleRoute: ApiPublicOgHandleRoute,
 }
 export const routeTree = rootRouteImport

@@ -1,42 +1,28 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useRouter } from "@tanstack/react-router";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { motion, AnimatePresence } from "motion/react";
 import confetti from "canvas-confetti";
-import { CHAINS, chainById, tokenById } from "@/lib/mock/chains";
-import type { Creator, Payment } from "@/lib/mock/creators";
-import { useKivo } from "@/lib/mock/store";
+import { chainById, tokenById } from "@/lib/fyora/chains";
+import type { Creator } from "@/lib/fyora/types";
+import { useFyoraAuth } from "@/lib/fyora/AuthProvider";
+import {
+  createPaymentIntentFn,
+  recordPaymentSubmissionFn,
+  refreshPaymentFn,
+} from "@/lib/fyora/server-functions";
 import { EmojiAvatar } from "./EmojiAvatar";
 import { ChainBadge, TokenBadge } from "./Badges";
 import { Sticker } from "./Sticker";
-import { ArrowRight, Check, Loader2, Mail, Wallet, Sparkles, ExternalLink } from "lucide-react";
+import { ArrowRight, Check, ExternalLink, Loader2, Mail, Sparkles } from "lucide-react";
 import { toast } from "sonner";
+import { createPaymentQuote, loadPrimaryAssets } from "@/lib/fyora/particle";
+import { useParticleSender } from "@/lib/fyora/useParticleSender";
 
 type Step = "confirm" | "connect" | "balance" | "signing" | "receipt";
-
-const BALANCES = [
-  { chain: "base", token: "usdc", amount: 148.22 },
-  { chain: "optimism", token: "usdc", amount: 62.5 },
-  { chain: "polygon", token: "usdt", amount: 40.1 },
-  { chain: "ethereum", token: "eth", amount: 0.048 },
-  { chain: "solana", token: "sol", amount: 3.21 },
-];
-const UNIFIED_TOTAL = 298.14;
-
-const SIGNING_STEPS = [
-  "Signing EIP-7702 authorization…",
-  "Routing across chains…",
-  "Bridging to Arbitrum…",
-  "Landing funds…",
-];
+type BalanceItem = { chain: string; token: string; amount: number; amountInUSD: number };
 
 const SUPPORTER_EMOJIS = ["🦊", "🐳", "🦁", "🐸", "🌻", "🚀", "✨", "🐧", "🌊", "🌟"];
-
-function mkTx() {
-  return (
-    "0x" +
-    Array.from({ length: 40 }, () => "0123456789abcdef"[Math.floor(Math.random() * 16)]).join("")
-  );
-}
 
 export function PaymentSheet({
   creator,
@@ -47,7 +33,7 @@ export function PaymentSheet({
 }: {
   creator: Creator;
   open: boolean;
-  onOpenChange: (v: boolean) => void;
+  onOpenChange: (value: boolean) => void;
   amount: number;
   note: string;
 }) {
@@ -55,67 +41,201 @@ export function PaymentSheet({
   const [email, setEmail] = useState("");
   const [connecting, setConnecting] = useState(false);
   const [signIdx, setSignIdx] = useState(0);
-  const [txId, setTxId] = useState<string>("");
-  const addPayment = useKivo((s) => s.addPayment);
+  const [txId, setTxId] = useState("");
+  const [universalxUrl, setUniversalxUrl] = useState("");
+  const [balances, setBalances] = useState<BalanceItem[]>([]);
+  const [unifiedTotal, setUnifiedTotal] = useState(0);
+  const [confirmed, setConfirmed] = useState(false);
+  const [supporterEmoji, setSupporterEmoji] = useState(SUPPORTER_EMOJIS[0]);
+  const [idempotencyKey, setIdempotencyKey] = useState("");
+  const { identity, refreshIdentity, signInWithEmail, signInWithGoogle } = useFyoraAuth();
+  const { sendPaymentQuote } = useParticleSender();
+  const router = useRouter();
 
   const chain = chainById(creator.settlement.chain);
   const token = tokenById(creator.settlement.token);
+  const signingSteps = useMemo(
+    () => [
+      "Signing EIP-7702 authorization...",
+      "Routing across chains...",
+      `Bridging to ${chain.name}...`,
+      `Landing ${token.symbol}...`,
+    ],
+    [chain.name, token.symbol],
+  );
 
   useEffect(() => {
-    if (!open) {
-      const t = setTimeout(() => {
-        setStep("confirm");
-        setEmail("");
-        setConnecting(false);
-        setSignIdx(0);
-        setTxId("");
-      }, 300);
-      return () => clearTimeout(t);
+    if (open) {
+      setSupporterEmoji(SUPPORTER_EMOJIS[Math.floor(Math.random() * SUPPORTER_EMOJIS.length)]);
+      setIdempotencyKey(crypto.randomUUID());
+      return;
     }
+    const timer = setTimeout(() => {
+      setStep("confirm");
+      setEmail("");
+      setConnecting(false);
+      setSignIdx(0);
+      setTxId("");
+      setUniversalxUrl("");
+      setBalances([]);
+      setUnifiedTotal(0);
+      setConfirmed(false);
+    }, 300);
+    return () => clearTimeout(timer);
   }, [open]);
 
+  const loadBalance = async (ownerAddress: string) => {
+    const response = await loadPrimaryAssets(ownerAddress);
+    setUnifiedTotal(response.totalAmountInUSD);
+    setBalances(
+      response.assets.flatMap((asset) =>
+        asset.chainAggregation
+          .filter((entry) => entry.amount > 0)
+          .map((entry) => ({
+            chain: chainById(String(entry.token.chainId)).id,
+            token: String(entry.token.type ?? entry.token.assetId).toLowerCase(),
+            amount: entry.amount,
+            amountInUSD: entry.amountInUSD,
+          })),
+      ),
+    );
+  };
+
+  const handleContinue = async () => {
+    if (!identity) {
+      setStep("connect");
+      return;
+    }
+    setConnecting(true);
+    try {
+      await loadBalance(identity.evmAddress);
+      setStep("balance");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not load Universal Balance.");
+    } finally {
+      setConnecting(false);
+    }
+  };
+
+  const handleEmailLogin = async () => {
+    setConnecting(true);
+    try {
+      await signInWithEmail(email);
+      toast.success("Complete sign-in in the Privy modal.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Privy sign-in failed.");
+    } finally {
+      setConnecting(false);
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    await signInWithGoogle();
+  };
+
   useEffect(() => {
-    if (step !== "signing") return;
-    setSignIdx(0);
-    const interval = setInterval(() => {
-      setSignIdx((i) => {
-        if (i >= SIGNING_STEPS.length - 1) {
-          clearInterval(interval);
-          setTimeout(() => {
-            const id = mkTx();
-            setTxId(id);
-            const p: Payment = {
-              id: "px" + Date.now(),
-              amountUsd: amount,
-              supporterName: email ? email.split("@")[0] : "Anon",
-              supporterEmoji: SUPPORTER_EMOJIS[Math.floor(Math.random() * SUPPORTER_EMOJIS.length)],
-              fromChain: "base",
-              fromToken: "usdc",
-              note: note || undefined,
-              txId: id,
-              createdAt: Date.now(),
-              status: "confirmed",
-            };
-            addPayment(creator.handle, p);
-            setStep("receipt");
-            confetti({
-              particleCount: 120,
-              spread: 80,
-              origin: { y: 0.5 },
-              colors: ["#C6F24E", "#FF6B4A", "#B8A6FF", "#FFD166"],
-            });
-          }, 500);
-          return i;
+    if (!open || step !== "connect" || !identity || connecting) return;
+    let cancelled = false;
+    setConnecting(true);
+    loadBalance(identity.evmAddress)
+      .then(() => {
+        if (!cancelled) setStep("balance");
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          toast.error(error instanceof Error ? error.message : "Could not load Universal Balance.");
         }
-        return i + 1;
+      })
+      .finally(() => {
+        if (!cancelled) setConnecting(false);
       });
-    }, 700);
-    return () => clearInterval(interval);
-  }, [step, amount, note, email, addPayment, creator.handle]);
+    return () => {
+      cancelled = true;
+    };
+  }, [connecting, identity, open, step]);
+
+  const handleOpenChange = (nextOpen: boolean) => {
+    if (!nextOpen && step === "signing") return;
+    onOpenChange(nextOpen);
+  };
+
+  const keepOpenWhileSigning = (event: Event) => {
+    if (step === "signing") event.preventDefault();
+  };
+
+  const pollUntilSettled = async (intentId: string, didToken: string) => {
+    for (let attempt = 0; attempt < 40; attempt += 1) {
+      const result = await refreshPaymentFn({ data: { didToken, intentId } });
+      if (["confirmed", "refunded", "failed"].includes(result.status)) return result;
+      await new Promise((resolve) => setTimeout(resolve, 3000));
+    }
+    return null;
+  };
+
+  const handleSend = async () => {
+    if (!identity) {
+      setStep("connect");
+      return;
+    }
+    setStep("signing");
+    setSignIdx(0);
+    try {
+      const currentIdentity = await refreshIdentity();
+      const intent = await createPaymentIntentFn({
+        data: {
+          didToken: currentIdentity.didToken,
+          handle: creator.handle,
+          amountUsd: amount,
+          note: note || undefined,
+          supporterName: identity.email?.split("@")[0],
+          supporterEmoji,
+          idempotencyKey,
+        },
+      });
+      const quote = await createPaymentQuote(currentIdentity.evmAddress, intent);
+      setSignIdx(1);
+      const submitted = await sendPaymentQuote(quote.account, quote.transaction);
+      setTxId(submitted.transactionId);
+      setSignIdx(2);
+      const recorded = await recordPaymentSubmissionFn({
+        data: {
+          didToken: currentIdentity.didToken,
+          intentId: intent.id,
+          transactionId: submitted.transactionId,
+        },
+      });
+      setUniversalxUrl(recorded.universalxUrl ?? "");
+      setSignIdx(3);
+      const settled = await pollUntilSettled(intent.id, currentIdentity.didToken);
+      if (settled?.status === "failed" || settled?.status === "refunded") {
+        throw new Error(`Particle transaction ${settled.status}.`);
+      }
+      setConfirmed(settled?.status === "confirmed");
+      setUniversalxUrl(settled?.universalxUrl ?? recorded.universalxUrl ?? "");
+      setStep("receipt");
+      if (settled?.status === "confirmed") {
+        await router.invalidate();
+        confetti({
+          particleCount: 120,
+          spread: 80,
+          origin: { y: 0.5 },
+          colors: ["#C6F24E", "#FF6B4A", "#B8A6FF", "#FFD166"],
+        });
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Payment could not be submitted.");
+      setStep("balance");
+    }
+  };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[calc(100vw-1.5rem)] sm:w-full max-w-md p-0 gap-0 chunky rounded-3xl shadow-sticker-lg overflow-hidden bg-card border-ink">
+    <Dialog open={open} onOpenChange={handleOpenChange} modal={step !== "signing"}>
+      <DialogContent
+        onEscapeKeyDown={keepOpenWhileSigning}
+        onInteractOutside={keepOpenWhileSigning}
+        onPointerDownOutside={keepOpenWhileSigning}
+        className="w-[calc(100vw-1.5rem)] sm:w-full max-w-md p-0 gap-0 chunky rounded-3xl shadow-sticker-lg overflow-hidden bg-card border-ink"
+      >
         <DialogTitle className="sr-only">Support {creator.name}</DialogTitle>
 
         <div className="px-4 sm:px-6 pt-5 sm:pt-6 pb-4 border-b-2 border-ink bg-paper flex items-center gap-3">
@@ -153,17 +273,18 @@ export function PaymentSheet({
                   </div>
                   {note && (
                     <div className="rounded-2xl chunky bg-butter/60 p-4 text-sm italic">
-                      "{note}"
+                      &quot;{note}&quot;
                     </div>
                   )}
                   <div className="text-xs text-muted-foreground text-center">
-                    ✨ No chain switching. No bridge. No gas math.
+                    No chain switching. No bridge. No gas math.
                   </div>
                   <button
-                    onClick={() => setStep("connect")}
-                    className="w-full rounded-full bg-ink text-paper py-4 text-lg font-semibold chunky shadow-sticker press"
+                    onClick={handleContinue}
+                    disabled={connecting}
+                    className="w-full rounded-full bg-ink text-paper py-4 text-lg font-semibold chunky shadow-sticker press disabled:opacity-60"
                   >
-                    Continue →
+                    {connecting ? "Loading balance..." : "Continue ->"}
                   </button>
                 </div>
               </StepWrap>
@@ -176,7 +297,6 @@ export function PaymentSheet({
                     <h3 className="font-display italic text-2xl">Sign in to pay</h3>
                     <p className="text-sm text-muted-foreground">One click. No app to install.</p>
                   </div>
-
                   <div className="rounded-2xl chunky bg-lilac/30 p-4">
                     <label className="text-xs uppercase font-bold text-muted-foreground tracking-wider">
                       Email
@@ -186,48 +306,33 @@ export function PaymentSheet({
                       <input
                         type="email"
                         value={email}
-                        onChange={(e) => setEmail(e.target.value)}
+                        onChange={(event) => setEmail(event.target.value)}
                         placeholder="you@somewhere.com"
                         className="flex-1 bg-transparent outline-none text-base"
                       />
                     </div>
                   </div>
-
                   <button
                     disabled={connecting || !email}
-                    onClick={() => {
-                      setConnecting(true);
-                      setTimeout(() => {
-                        setConnecting(false);
-                        setStep("balance");
-                      }, 1400);
-                    }}
+                    onClick={handleEmailLogin}
                     className="w-full rounded-full bg-lime text-ink py-4 font-semibold chunky shadow-sticker press flex items-center justify-center gap-2 disabled:opacity-60"
                   >
                     {connecting ? (
                       <>
-                        <Loader2 className="w-4 h-4 animate-spin" /> Magic-linking…
+                        <Loader2 className="w-4 h-4 animate-spin" /> Opening Privy...
                       </>
                     ) : (
                       <>
-                        <Sparkles className="w-4 h-4" /> Continue with Magic
+                        <Sparkles className="w-4 h-4" /> Continue with Privy
                       </>
                     )}
                   </button>
-
                   <div className="text-center text-xs text-muted-foreground">or</div>
-
                   <button
-                    onClick={() => {
-                      setConnecting(true);
-                      setTimeout(() => {
-                        setConnecting(false);
-                        setStep("balance");
-                      }, 900);
-                    }}
+                    onClick={handleGoogleLogin}
                     className="w-full rounded-full bg-card py-3 font-semibold chunky shadow-sticker-sm press flex items-center justify-center gap-2"
                   >
-                    <Wallet className="w-4 h-4" /> Continue with wallet
+                    <Sparkles className="w-4 h-4" /> Continue with Google
                   </button>
                 </div>
               </StepWrap>
@@ -241,10 +346,11 @@ export function PaymentSheet({
                       Your unified balance
                     </div>
                     <div className="font-display italic text-4xl sm:text-5xl mt-1">
-                      ${UNIFIED_TOTAL.toFixed(2)}
+                      ${unifiedTotal.toFixed(2)}
                     </div>
                     <div className="text-xs text-muted-foreground mt-1">
-                      across {BALANCES.length} chains — spend it anywhere
+                      across {new Set(balances.map((item) => item.chain)).size} chains - spend it
+                      anywhere
                     </div>
                     <div className="absolute -right-4 -top-4 rotate-12">
                       <Sticker color="ink" rotate={12}>
@@ -252,38 +358,36 @@ export function PaymentSheet({
                       </Sticker>
                     </div>
                   </div>
-
                   <div className="space-y-2 max-h-[160px] overflow-y-auto pr-1">
-                    {BALANCES.map((b) => (
+                    {balances.map((balance) => (
                       <div
-                        key={b.chain}
+                        key={`${balance.chain}:${balance.token}`}
                         className="flex items-center justify-between rounded-xl chunky bg-card px-3 py-2"
                       >
                         <div className="flex items-center gap-2">
-                          <ChainBadge id={b.chain} />
-                          <TokenBadge id={b.token} size="sm" />
+                          <ChainBadge id={balance.chain} />
+                          <TokenBadge id={balance.token} size="sm" />
                         </div>
                         <div className="text-sm font-mono">
-                          {b.amount.toLocaleString(undefined, { maximumFractionDigits: 3 })}
+                          {balance.amount.toLocaleString(undefined, { maximumFractionDigits: 3 })}
                         </div>
                       </div>
                     ))}
                   </div>
-
                   <div className="rounded-2xl chunky bg-secondary p-3 flex items-center gap-2 text-sm">
                     <span className="font-semibold">Route:</span>
-                    <TokenBadge id="usdc" size="sm" />
-                    <ChainBadge id="base" size="sm" />
+                    <TokenBadge id={balances[0]?.token ?? "usdc"} size="sm" />
+                    <ChainBadge id={balances[0]?.chain ?? "base"} size="sm" />
                     <ArrowRight className="w-3 h-3" />
                     <TokenBadge id={creator.settlement.token} size="sm" />
                     <ChainBadge id={creator.settlement.chain} size="sm" />
                   </div>
-
                   <button
-                    onClick={() => setStep("signing")}
-                    className="w-full rounded-full bg-ink text-paper py-4 text-lg font-semibold chunky shadow-sticker press"
+                    onClick={handleSend}
+                    disabled={unifiedTotal < amount || !idempotencyKey}
+                    className="w-full rounded-full bg-ink text-paper py-4 text-lg font-semibold chunky shadow-sticker press disabled:opacity-60"
                   >
-                    Sign & send ${amount} →
+                    {unifiedTotal < amount ? "Insufficient balance" : `Sign & send $${amount} ->`}
                   </button>
                 </div>
               </StepWrap>
@@ -300,21 +404,19 @@ export function PaymentSheet({
                     ⚡
                   </motion.div>
                   <div className="w-full space-y-2">
-                    {SIGNING_STEPS.map((s, i) => (
+                    {signingSteps.map((label, index) => (
                       <div
-                        key={s}
-                        className={`flex items-center gap-2 text-sm transition-opacity ${
-                          i <= signIdx ? "opacity-100" : "opacity-30"
-                        }`}
+                        key={label}
+                        className={`flex items-center gap-2 text-sm transition-opacity ${index <= signIdx ? "opacity-100" : "opacity-30"}`}
                       >
-                        {i < signIdx ? (
+                        {index < signIdx ? (
                           <Check className="w-4 h-4 text-lime" strokeWidth={3} />
-                        ) : i === signIdx ? (
+                        ) : index === signIdx ? (
                           <Loader2 className="w-4 h-4 animate-spin" />
                         ) : (
                           <div className="w-4 h-4 rounded-full border-2 border-current opacity-40" />
                         )}
-                        {s}
+                        {label}
                       </div>
                     ))}
                   </div>
@@ -334,23 +436,28 @@ export function PaymentSheet({
                     <Check className="w-12 h-12 text-ink" strokeWidth={3} />
                   </motion.div>
                   <div>
-                    <h3 className="font-display italic text-3xl">Sent!</h3>
+                    <h3 className="font-display italic text-3xl">
+                      {confirmed ? "Sent!" : "Submitted!"}
+                    </h3>
                     <p className="text-sm text-muted-foreground">
-                      ${amount} landed for {creator.name}
+                      {confirmed
+                        ? `$${amount} landed for ${creator.name}`
+                        : `$${amount} is still settling for ${creator.name}`}
                     </p>
                   </div>
                   <div className="rounded-2xl chunky bg-secondary p-3 text-left text-xs font-mono break-all">
                     <div className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider mb-1 font-sans">
-                      Transaction
+                      Particle transaction
                     </div>
                     {txId}
                   </div>
                   <div className="flex gap-2">
                     <button
-                      onClick={() => {
-                        toast("Opening UniversalX…", { icon: "🚀" });
-                      }}
-                      className="flex-1 rounded-full bg-ink text-paper py-3 font-semibold chunky shadow-sticker-sm press inline-flex items-center justify-center gap-1.5"
+                      onClick={() =>
+                        universalxUrl && window.open(universalxUrl, "_blank", "noopener,noreferrer")
+                      }
+                      disabled={!universalxUrl}
+                      className="flex-1 rounded-full bg-ink text-paper py-3 font-semibold chunky shadow-sticker-sm press inline-flex items-center justify-center gap-1.5 disabled:opacity-60"
                     >
                       <ExternalLink className="w-4 h-4" /> UniversalX
                     </button>
@@ -371,7 +478,7 @@ export function PaymentSheet({
   );
 }
 
-function StepWrap({ children }: { children: React.ReactNode }) {
+function StepWrap({ children }: { children: ReactNode }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}

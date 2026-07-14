@@ -1,8 +1,9 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { EmojiAvatar } from "./EmojiAvatar";
 import { BrandLink } from "./Logo";
-import { useKivo } from "@/lib/mock/store";
-import { useHydrated } from "@/lib/mock/useHydrated";
+import { useFyoraAuth } from "@/lib/fyora/AuthProvider";
+import { getMyCreatorFn } from "@/lib/fyora/server-functions";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,24 +12,45 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Eye, LayoutDashboard, LogOut, Link2, ChevronDown } from "lucide-react";
+import {
+  ChevronDown,
+  Eye,
+  LayoutDashboard,
+  Link2,
+  LogOut,
+  UserPlus,
+  WalletCards,
+} from "lucide-react";
 import { toast } from "sonner";
 
 export function Header() {
-  const hydrated = useHydrated();
-  const current = useKivo((s) => (s.currentHandle ? s.creators[s.currentHandle] : undefined));
-  const disconnect = useKivo((s) => s.disconnect);
+  const { identity, loading, refreshIdentity, signOut } = useFyoraAuth();
+  const queryClient = useQueryClient();
+  const { data: current } = useQuery({
+    queryKey: ["creator", identity?.issuer],
+    queryFn: async () => {
+      const currentIdentity = await refreshIdentity();
+      return getMyCreatorFn({ data: { didToken: currentIdentity.didToken } });
+    },
+    enabled: Boolean(identity),
+    retry: false,
+  });
   const navigate = useNavigate();
 
-  const handleDisconnect = () => {
-    disconnect();
+  const handleDisconnect = async () => {
+    try {
+      await signOut();
+    } catch (error) {
+      console.error("Disconnect failed:", error);
+    }
+    queryClient.clear();
     toast("Disconnected", { icon: "👋", description: "Wallet & session cleared." });
     navigate({ to: "/" });
   };
 
   return (
     <header className="sticky top-0 z-40 bg-paper/85 backdrop-blur border-b-2 border-ink">
-      <div className="mx-auto max-w-6xl px-4 sm:px-6 h-16 flex items-center justify-between">
+      <div className="mx-auto max-w-6xl px-3 sm:px-6 h-16 flex items-center justify-between gap-2">
         <BrandLink />
 
         <nav className="flex items-center gap-1 sm:gap-2 text-sm font-medium min-w-0">
@@ -40,16 +62,21 @@ export function Header() {
             Explore
           </Link>
 
-          {hydrated && current ? (
+          {!loading && identity ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button className="ml-1 sm:ml-2 flex items-center gap-2 rounded-full bg-card chunky shadow-sticker-sm pl-1 pr-2 sm:pr-3 py-1 press min-w-0">
-                  <EmojiAvatar emoji={current.emoji} gradient={current.gradient} size={26} />
+                  <EmojiAvatar
+                    emoji={current?.emoji ?? "✨"}
+                    gradient={current?.gradient ?? ["#c9ff43", "#ff6b5c"]}
+                    avatarUrl={current?.avatarUrl}
+                    size={26}
+                  />
                   <span
                     className="text-xs sm:text-sm font-semibold truncate max-w-[90px] sm:max-w-none"
                     style={{ fontFamily: "var(--font-mono)" }}
                   >
-                    @{current.handle}
+                    {current ? `@${current.handle}` : "Account"}
                   </span>
                   <ChevronDown className="w-3.5 h-3.5 opacity-60" />
                 </button>
@@ -67,31 +94,58 @@ export function Header() {
                     className="font-semibold text-sm truncate"
                     style={{ fontFamily: "var(--font-mono)" }}
                   >
-                    @{current.handle}
+                    {current ? `@${current.handle}` : (identity.email ?? "Privy account")}
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={() => navigate({ to: "/$handle", params: { handle: current.handle } })}
-                  className="rounded-xl cursor-pointer gap-2 font-medium focus:bg-secondary"
-                >
-                  <Eye className="w-4 h-4" /> Preview page
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => navigate({ to: "/dashboard" })}
-                  className="rounded-xl cursor-pointer gap-2 font-medium focus:bg-secondary"
-                >
-                  <LayoutDashboard className="w-4 h-4" /> Dashboard
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => {
-                    navigator.clipboard?.writeText(`https://fyora.app/${current.handle}`);
-                    toast("Link copied", { icon: "🔗" });
-                  }}
-                  className="rounded-xl cursor-pointer gap-2 font-medium focus:bg-secondary"
-                >
-                  <Link2 className="w-4 h-4" /> Copy link
-                </DropdownMenuItem>
+                {current ? (
+                  <>
+                    <DropdownMenuItem
+                      onClick={() =>
+                        navigate({ to: "/$handle", params: { handle: current.handle } })
+                      }
+                      className="rounded-xl cursor-pointer gap-2 font-medium focus:bg-secondary"
+                    >
+                      <Eye className="w-4 h-4" /> Preview page
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => navigate({ to: "/dashboard" })}
+                      className="rounded-xl cursor-pointer gap-2 font-medium focus:bg-secondary"
+                    >
+                      <LayoutDashboard className="w-4 h-4" /> Dashboard
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => navigate({ to: "/wallet" })}
+                      className="rounded-xl cursor-pointer gap-2 font-medium focus:bg-secondary"
+                    >
+                      <WalletCards className="w-4 h-4" /> Wallet
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => {
+                        navigator.clipboard?.writeText(`https://www.fyora.app/${current.handle}`);
+                        toast("Link copied", { icon: "🔗" });
+                      }}
+                      className="rounded-xl cursor-pointer gap-2 font-medium focus:bg-secondary"
+                    >
+                      <Link2 className="w-4 h-4" /> Copy link
+                    </DropdownMenuItem>
+                  </>
+                ) : (
+                  <>
+                    <DropdownMenuItem
+                      onClick={() => navigate({ to: "/wallet" })}
+                      className="rounded-xl cursor-pointer gap-2 font-medium focus:bg-secondary"
+                    >
+                      <WalletCards className="w-4 h-4" /> Wallet
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => navigate({ to: "/onboard" })}
+                      className="rounded-xl cursor-pointer gap-2 font-medium focus:bg-secondary"
+                    >
+                      <UserPlus className="w-4 h-4" /> Claim page
+                    </DropdownMenuItem>
+                  </>
+                )}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   onClick={handleDisconnect}
@@ -104,9 +158,9 @@ export function Header() {
           ) : (
             <Link
               to="/onboard"
-              className="ml-1 sm:ml-3 rounded-full bg-ink text-paper px-3 sm:px-4 py-2 font-semibold chunky shadow-sticker-sm press text-xs sm:text-sm whitespace-nowrap"
+              className="ml-0.5 sm:ml-3 rounded-full bg-ink text-paper px-2.5 sm:px-4 py-2 font-semibold chunky shadow-sticker-sm press text-xs sm:text-sm whitespace-nowrap"
             >
-              Claim page
+              Claim<span className="hidden sm:inline"> page</span>
             </Link>
           )}
         </nav>

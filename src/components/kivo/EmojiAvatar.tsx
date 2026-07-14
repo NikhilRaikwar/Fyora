@@ -8,12 +8,14 @@ export function EmojiAvatar({
   size = 64,
   className,
   animate = false,
+  avatarUrl,
 }: {
   emoji: string;
   gradient: [string, string];
   size?: number;
   className?: string;
   animate?: boolean;
+  avatarUrl?: string | null;
 }) {
   const Comp = (animate ? motion.div : "div") as ElementType;
   return (
@@ -24,7 +26,7 @@ export function EmojiAvatar({
         transition: { type: "spring", stiffness: 200, damping: 12 },
       })}
       className={cn(
-        "flex items-center justify-center rounded-full chunky shadow-sticker shrink-0",
+        "flex items-center justify-center overflow-hidden rounded-full chunky shadow-sticker shrink-0",
         className,
       )}
       style={{
@@ -34,7 +36,11 @@ export function EmojiAvatar({
         fontSize: size * 0.55,
       }}
     >
-      <span style={{ filter: "drop-shadow(0 1px 0 rgba(0,0,0,0.15))" }}>{emoji}</span>
+      {avatarUrl ? (
+        <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
+      ) : (
+        <span style={{ filter: "drop-shadow(0 1px 0 rgba(0,0,0,0.15))" }}>{emoji}</span>
+      )}
     </Comp>
   );
 }

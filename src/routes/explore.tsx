@@ -3,13 +3,18 @@ import { Header } from "@/components/kivo/Header";
 import { EmojiAvatar } from "@/components/kivo/EmojiAvatar";
 import { ChainBadge, TokenBadge } from "@/components/kivo/Badges";
 import { Sticker } from "@/components/kivo/Sticker";
-import { useKivo } from "@/lib/mock/store";
-import { useHydrated } from "@/lib/mock/useHydrated";
-import { SEED_CREATORS } from "@/lib/mock/creators";
+import { listPublicCreatorsFn } from "@/lib/fyora/server-functions";
 import { ArrowRight, Search } from "lucide-react";
 import { useState } from "react";
 
 export const Route = createFileRoute("/explore")({
+  loader: async () => {
+    try {
+      return await listPublicCreatorsFn();
+    } catch {
+      return [];
+    }
+  },
   head: () => ({
     meta: [
       { title: "Explore Creators — Fyora" },
@@ -25,10 +30,8 @@ export const Route = createFileRoute("/explore")({
 });
 
 function Explore() {
-  const hydrated = useHydrated();
-  const stored = useKivo((s) => s.creators);
   const [q, setQ] = useState("");
-  const creators = hydrated ? Object.values(stored) : SEED_CREATORS;
+  const creators = Route.useLoaderData();
   const filtered = creators.filter(
     (c) =>
       c.handle.toLowerCase().includes(q.toLowerCase()) ||
