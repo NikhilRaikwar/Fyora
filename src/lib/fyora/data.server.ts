@@ -3,7 +3,7 @@ import { getSupabaseServerClient } from "./supabase.server";
 import { resolveSettlementAsset } from "./settlement";
 import type {
   Creator,
-  MagicIdentity,
+  FyoraIdentity,
   Payment,
   PaymentIntent,
   SettlementAsset,
@@ -13,6 +13,10 @@ import type {
 type ProfileRow = Tables<"profiles">;
 type SettlementRow = Tables<"settlement_configs">;
 type PaymentRow = Tables<"payments">;
+type UniversalSettlementAddresses = {
+  evmUaAddress: string;
+  solanaUaAddress: string | null;
+};
 
 function asGradient(value: unknown): [string, string] {
   return Array.isArray(value) &&
@@ -69,10 +73,12 @@ function mapCreator(
 ): Creator {
   return {
     profileId: profile.id,
+    updatedAt: Date.parse(profile.updated_at),
     handle: profile.handle,
     name: profile.display_name,
     bio: profile.bio,
     emoji: profile.avatar_emoji,
+    avatarUrl: profile.avatar_url,
     gradient: asGradient(profile.gradient),
     socials: asSocials(profile.socials),
     settlement: {
@@ -111,6 +117,29 @@ async function loadCreator(profile: ProfileRow, includePrivatePayments = false) 
   return mapCreator(profile, settlement, payments ?? []);
 }
 
+async function updateProfileOwner(profile: ProfileRow, identity: FyoraIdentity) {
+  if (
+    profile.owner_magic_issuer === identity.issuer &&
+    profile.owner_evm_address === identity.evmAddress &&
+    profile.owner_solana_address === identity.solanaAddress
+  ) {
+    return profile;
+  }
+  const { data, error } = await getSupabaseServerClient()
+    .from("profiles")
+    .update({
+      owner_magic_issuer: identity.issuer,
+      owner_evm_address: identity.evmAddress,
+      owner_solana_address: identity.solanaAddress,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", profile.id)
+    .select("*")
+    .single();
+  if (error) throw error;
+  return data;
+}
+
 export async function getPublicCreator(handle: string) {
   const { data, error } = await getSupabaseServerClient()
     .from("profiles")
@@ -133,25 +162,41 @@ export async function listPublicCreators() {
   return Promise.all((data ?? []).map((profile) => loadCreator(profile)));
 }
 
-export async function getCreatorForIdentity(identity: MagicIdentity) {
-  const { data, error } = await getSupabaseServerClient()
+export async function getCreatorForIdentity(identity: FyoraIdentity) {
+  const supabase = getSupabaseServerClient();
+  const { data, error } = await supabase
     .from("profiles")
     .select("*")
     .eq("owner_magic_issuer", identity.issuer)
     .maybeSingle();
   if (error) throw error;
-  return data ? loadCreator(data, true) : null;
+  if (data) return loadCreator(data, true);
+
+  const { data: evmProfile, error: evmError } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("owner_evm_address", identity.evmAddress)
+    .maybeSingle();
+  if (evmError) throw evmError;
+  if (!evmProfile) return null;
+  return loadCreator(await updateProfileOwner(evmProfile, identity), true);
 }
 
-function receiverFor(identity: MagicIdentity, asset: SettlementAsset) {
+function receiverFor(asset: SettlementAsset, addresses: UniversalSettlementAddresses) {
   if (asset.networkType === "solana") {
-    if (!identity.solanaAddress) throw new Error("Magic did not provision a Solana wallet.");
-    return identity.solanaAddress;
+    if (!addresses.solanaUaAddress) {
+      throw new Error("Particle did not return a Solana Universal receive address yet.");
+    }
+    return addresses.solanaUaAddress;
   }
-  return identity.evmAddress;
+  return addresses.evmUaAddress;
 }
 
-function settlementInsert(profileId: string, identity: MagicIdentity, asset: SettlementAsset) {
+async function settlementInsert(
+  profileId: string,
+  asset: SettlementAsset,
+  universalAddresses: UniversalSettlementAddresses,
+) {
   return {
     profile_id: profileId,
     network_type: asset.networkType,
@@ -160,12 +205,12 @@ function settlementInsert(profileId: string, identity: MagicIdentity, asset: Set
     token_symbol: asset.tokenSymbol,
     token_address: asset.tokenAddress,
     token_decimals: asset.tokenDecimals,
-    receiver_address: receiverFor(identity, asset),
+    receiver_address: receiverFor(asset, universalAddresses),
   } as const;
 }
 
 export async function claimCreator(input: {
-  identity: MagicIdentity;
+  identity: FyoraIdentity;
   handle: string;
   name: string;
   bio: string;
@@ -174,6 +219,7 @@ export async function claimCreator(input: {
   socials: Social[];
   chainId: number;
   tokenAddress: string;
+  universalAddresses: UniversalSettlementAddresses;
 }) {
   const asset = resolveSettlementAsset(input.chainId, input.tokenAddress);
   if (!asset) throw new Error("That settlement token is not supported by Particle.");
@@ -198,7 +244,7 @@ export async function claimCreator(input: {
   if (error) throw error;
   const { error: settlementError } = await supabase
     .from("settlement_configs")
-    .insert(settlementInsert(profile.id, input.identity, asset));
+    .insert(await settlementInsert(profile.id, asset, input.universalAddresses));
   if (settlementError) {
     await supabase.from("profiles").delete().eq("id", profile.id);
     throw settlementError;
@@ -207,12 +253,13 @@ export async function claimCreator(input: {
 }
 
 export async function updateCreator(input: {
-  identity: MagicIdentity;
+  identity: FyoraIdentity;
   name: string;
   bio: string;
   emoji: string;
   chainId: number;
   tokenAddress: string;
+  universalAddresses: UniversalSettlementAddresses;
 }) {
   const current = await getCreatorForIdentity(input.identity);
   if (!current) throw new Error("Creator profile not found.");
@@ -227,14 +274,77 @@ export async function updateCreator(input: {
   if (profileError) throw profileError;
   const { error: settlementError } = await supabase
     .from("settlement_configs")
-    .update(settlementInsert(current.profileId, input.identity, asset))
+    .update(await settlementInsert(current.profileId, asset, input.universalAddresses))
     .eq("profile_id", current.profileId);
   if (settlementError) throw settlementError;
   return getCreatorForIdentity(input.identity);
 }
 
+export async function refreshCreatorSettlement(input: {
+  identity: FyoraIdentity;
+  universalAddresses: UniversalSettlementAddresses;
+}) {
+  const current = await getCreatorForIdentity(input.identity);
+  if (!current) throw new Error("Creator profile not found.");
+  const asset = resolveSettlementAsset(current.settlement.chainId, current.settlement.tokenAddress);
+  if (!asset) throw new Error("That settlement token is not supported by Particle.");
+  const supabase = getSupabaseServerClient();
+  const { error } = await supabase
+    .from("settlement_configs")
+    .update(await settlementInsert(current.profileId, asset, input.universalAddresses))
+    .eq("profile_id", current.profileId);
+  if (error) throw error;
+  return getCreatorForIdentity(input.identity);
+}
+
+export async function refreshCreatorShareCard(identity: FyoraIdentity) {
+  const current = await getCreatorForIdentity(identity);
+  if (!current) throw new Error("Creator profile not found.");
+  const { error } = await getSupabaseServerClient()
+    .from("profiles")
+    .update({ updated_at: new Date().toISOString() })
+    .eq("id", current.profileId)
+    .eq("owner_magic_issuer", identity.issuer);
+  if (error) throw error;
+  return getCreatorForIdentity(identity);
+}
+
+export async function updateCreatorAvatar(input: {
+  identity: FyoraIdentity;
+  fileName: string;
+  contentType: string;
+  base64: string;
+}) {
+  const current = await getCreatorForIdentity(input.identity);
+  if (!current) throw new Error("Creator profile not found.");
+  if (!["image/png", "image/jpeg", "image/webp"].includes(input.contentType)) {
+    throw new Error("Upload a PNG, JPEG, or WebP image.");
+  }
+  const bytes = Uint8Array.from(Buffer.from(input.base64, "base64"));
+  if (bytes.byteLength > 2_097_152) throw new Error("Avatar image must be smaller than 2 MB.");
+  const extension =
+    input.contentType === "image/png" ? "png" : input.contentType === "image/webp" ? "webp" : "jpg";
+  const supabase = getSupabaseServerClient();
+  const objectPath = `${current.profileId}/avatar-${Date.now()}.${extension}`;
+  const { error: uploadError } = await supabase.storage
+    .from("creator-avatars")
+    .upload(objectPath, bytes, {
+      contentType: input.contentType,
+      upsert: true,
+    });
+  if (uploadError) throw uploadError;
+  const { data } = supabase.storage.from("creator-avatars").getPublicUrl(objectPath);
+  const { error: profileError } = await supabase
+    .from("profiles")
+    .update({ avatar_url: data.publicUrl })
+    .eq("id", current.profileId)
+    .eq("owner_magic_issuer", input.identity.issuer);
+  if (profileError) throw profileError;
+  return getCreatorForIdentity(input.identity);
+}
+
 export async function createPaymentIntent(input: {
-  identity: MagicIdentity;
+  identity: FyoraIdentity;
   handle: string;
   amountUsd: number;
   note?: string;
@@ -300,7 +410,7 @@ function rowToIntent(row: PaymentRow): PaymentIntent {
 }
 
 export async function recordPaymentSubmission(input: {
-  identity: MagicIdentity;
+  identity: FyoraIdentity;
   intentId: string;
   transactionId: string;
 }) {
@@ -323,7 +433,7 @@ export async function recordPaymentSubmission(input: {
   return rowToIntent(data);
 }
 
-export async function getPaymentForIdentity(intentId: string, identity: MagicIdentity) {
+export async function getPaymentForIdentity(intentId: string, identity: FyoraIdentity) {
   const { data, error } = await getSupabaseServerClient()
     .from("payments")
     .select("*")

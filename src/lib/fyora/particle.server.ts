@@ -82,7 +82,8 @@ export async function verifyParticlePayment(payment: Tables<"payments">) {
       ? transaction.sender
       : ((transaction.smartAccountOptions as Record<string, unknown> | undefined)?.ownerAddress as
           string | undefined);
-  if (owner && owner.toLowerCase() !== payment.supporter_evm_address) {
+  const allowedOwner = payment.supporter_evm_address;
+  if (owner && owner.toLowerCase() !== allowedOwner.toLowerCase()) {
     throw new Error("Particle transaction owner does not match the supporter.");
   }
   const statusCode = Number(transaction.status);

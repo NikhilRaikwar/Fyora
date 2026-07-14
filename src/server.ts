@@ -49,7 +49,28 @@ export default {
     try {
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
-      return await normalizeCatastrophicSsrResponse(response);
+      const normalized = await normalizeCatastrophicSsrResponse(response);
+
+      const csp = normalized.headers.get("content-security-policy");
+      if (
+        csp &&
+        csp.includes("script-src") &&
+        !csp.includes("'wasm-unsafe-eval'") &&
+        !csp.includes("'unsafe-eval'")
+      ) {
+        const newHeaders = new Headers(normalized.headers);
+        newHeaders.set(
+          "content-security-policy",
+          csp.replace("script-src", "script-src 'wasm-unsafe-eval'")
+        );
+        return new Response(normalized.body, {
+          status: normalized.status,
+          statusText: normalized.statusText,
+          headers: newHeaders,
+        });
+      }
+
+      return normalized;
     } catch (error) {
       console.error(error);
       return new Response(renderErrorPage(), {

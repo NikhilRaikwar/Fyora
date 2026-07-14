@@ -31,17 +31,19 @@ export type Settlement = {
 
 export type Creator = {
   profileId: string;
+  updatedAt: number;
   handle: string;
   name: string;
   bio: string;
   emoji: string;
+  avatarUrl: string | null;
   gradient: [string, string];
   socials: Social[];
   settlement: Settlement;
   payments: Payment[];
 };
 
-export type MagicIdentity = {
+export type FyoraIdentity = {
   didToken: string;
   issuer: string;
   email: string | null;

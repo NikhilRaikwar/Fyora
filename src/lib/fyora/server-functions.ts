@@ -13,14 +13,26 @@ const chainSchema = z.object({
   chainId: z.number().int().positive(),
   tokenAddress: z.string().trim().min(1).max(128),
 });
+const universalAddressesSchema = z.object({
+  evmUaAddress: z
+    .string()
+    .trim()
+    .regex(/^0x[0-9a-fA-F]{40}$/),
+  solanaUaAddress: z
+    .string()
+    .trim()
+    .regex(/^[1-9A-HJ-NP-Za-km-z]{32,44}$/)
+    .nullable(),
+  mode: z.enum(["separateSmartAccount", "eip7702OwnerAddress"]),
+});
 const socialSchema = z.object({
   kind: z.enum(["x", "github", "site", "youtube", "ig"]),
   url: z.string().url().max(500),
 });
 
 async function identityFor(didToken: string) {
-  const { verifyMagicIdentity } = await import("./magic.server");
-  return verifyMagicIdentity(didToken);
+  const { verifyFyoraIdentity } = await import("./privy.server");
+  return verifyFyoraIdentity(didToken);
 }
 
 export const listPublicCreatorsFn = createServerFn({ method: "GET" }).handler(async () => {
@@ -54,6 +66,7 @@ export const claimCreatorFn = createServerFn({ method: "POST" })
         emoji: z.string().trim().min(1).max(16),
         gradient: z.tuple([z.string().max(32), z.string().max(32)]),
         socials: z.array(socialSchema).max(8),
+        universalAddresses: universalAddressesSchema,
       })
       .and(chainSchema),
   )
@@ -71,6 +84,7 @@ export const updateCreatorFn = createServerFn({ method: "POST" })
         name: z.string().trim().min(1).max(60),
         bio: z.string().trim().max(240),
         emoji: z.string().trim().min(1).max(16),
+        universalAddresses: universalAddressesSchema,
       })
       .and(chainSchema),
   )
@@ -78,6 +92,37 @@ export const updateCreatorFn = createServerFn({ method: "POST" })
     const identity = await identityFor(data.didToken);
     const { updateCreator } = await import("./data.server");
     return updateCreator({ identity, ...data });
+  });
+
+export const refreshCreatorSettlementFn = createServerFn({ method: "POST" })
+  .validator(z.object({ didToken: didSchema, universalAddresses: universalAddressesSchema }))
+  .handler(async ({ data }) => {
+    const identity = await identityFor(data.didToken);
+    const { refreshCreatorSettlement } = await import("./data.server");
+    return refreshCreatorSettlement({ identity, universalAddresses: data.universalAddresses });
+  });
+
+export const refreshCreatorShareCardFn = createServerFn({ method: "POST" })
+  .validator(z.object({ didToken: didSchema }))
+  .handler(async ({ data }) => {
+    const identity = await identityFor(data.didToken);
+    const { refreshCreatorShareCard } = await import("./data.server");
+    return refreshCreatorShareCard(identity);
+  });
+
+export const updateCreatorAvatarFn = createServerFn({ method: "POST" })
+  .validator(
+    z.object({
+      didToken: didSchema,
+      fileName: z.string().trim().min(1).max(180),
+      contentType: z.enum(["image/png", "image/jpeg", "image/webp"]),
+      base64: z.string().min(10).max(3_000_000),
+    }),
+  )
+  .handler(async ({ data }) => {
+    const identity = await identityFor(data.didToken);
+    const { updateCreatorAvatar } = await import("./data.server");
+    return updateCreatorAvatar({ identity, ...data });
   });
 
 export const createPaymentIntentFn = createServerFn({ method: "POST" })
