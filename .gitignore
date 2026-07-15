@@ -36,3 +36,7 @@ dist-ssr
 
 # Local agent tooling
 .agents/skills/
+
+# Local recovery tools and throwaway experiments
+temp/
+.local-tools/

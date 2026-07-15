@@ -1,5 +1,6 @@
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 import { nodePolyfills } from "vite-plugin-node-polyfills";
+import type { PluginOption } from "vite";
 
 export default defineConfig(({ isSsrBuild }) => {
   return {
@@ -13,7 +14,7 @@ export default defineConfig(({ isSsrBuild }) => {
               process: true,
             },
           }),
-      ].filter(Boolean) as any[],
+      ].filter(Boolean) as PluginOption[],
     },
     tanstackStart: {
       // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).

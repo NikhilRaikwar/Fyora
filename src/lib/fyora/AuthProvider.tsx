@@ -4,20 +4,18 @@ import {
   useContext,
   useEffect,
   useMemo,
-  useRef,
   useState,
   type ReactNode,
 } from "react";
+import { AuthType, type UserInfo } from "@particle-network/auth-core";
 import {
-  PrivyProvider,
-  useCreateWallet,
-  usePrivy,
-  useWallets,
-  type User,
-} from "@privy-io/react-auth";
+  AuthCoreContextProvider,
+  useAuthCore,
+  useConnect,
+  useEthereum,
+} from "@particle-network/authkit";
+import { arbitrum, base, bsc, mainnet, solana } from "@particle-network/authkit/chains";
 import type { FyoraIdentity } from "./types";
-
-const PRIVY_APP_ID = import.meta.env.VITE_PRIVY_APP_ID || "cmrjpk5nm00490cl2w5go8pq4";
 
 type AuthContextValue = {
   identity: FyoraIdentity | null;
@@ -26,90 +24,84 @@ type AuthContextValue = {
   signInWithGoogle: () => Promise<void>;
   refreshIdentity: () => Promise<FyoraIdentity>;
   signOut: () => Promise<void>;
+  openWallet: () => void;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-function isPrivyEmbeddedWallet(wallet: { type: string; walletClientType: string }) {
+function env(name: string) {
+  const value = (import.meta.env[name] as string | undefined)?.trim();
+  if (!value) throw new Error(`${name} is missing.`);
+  return value;
+}
+
+function emailFor(userInfo: UserInfo) {
   return (
-    wallet.type === "ethereum" &&
-    (wallet.walletClientType === "privy" || wallet.walletClientType === "privy-v2")
+    userInfo.email ??
+    userInfo.google_email ??
+    userInfo.apple_email ??
+    userInfo.github_email ??
+    userInfo.discord_email ??
+    null
   );
 }
 
-function emailFor(user: User) {
-  return user.email?.address ?? user.google?.email ?? null;
+function solanaAddressFor(userInfo: UserInfo) {
+  return (
+    userInfo.wallets.find((wallet) => wallet.chain_name === "solana")?.public_address?.trim() ??
+    null
+  );
+}
+
+function encodeParticleSession(userInfo: UserInfo) {
+  return JSON.stringify({
+    provider: "particle",
+    uuid: userInfo.uuid,
+    token: userInfo.token,
+  });
 }
 
 function missingIdentityError() {
-  return new Error("Privy embedded wallet is still getting ready. Try again in a moment.");
+  return new Error("Particle Auth wallet is still getting ready. Try again in a moment.");
 }
 
 function FyoraAuthProviderInner({ children }: { children: ReactNode }) {
-  const { ready, authenticated, user, login, logout, getAccessToken } = usePrivy();
-  const { wallets, ready: walletsReady } = useWallets();
-  const { createWallet } = useCreateWallet();
+  const { connect, disconnect, connected, connectionStatus } = useConnect();
+  const { userInfo, openWallet: openParticleWallet } = useAuthCore();
+  const { address, enable } = useEthereum();
   const [identity, setIdentity] = useState<FyoraIdentity | null>(null);
-  const creatingWallet = useRef(false);
-
-  const embeddedWallet = useMemo(
-    () => (wallets ?? []).find(isPrivyEmbeddedWallet) ?? null,
-    [wallets],
-  );
 
   const buildIdentity = useCallback(async (): Promise<FyoraIdentity> => {
-    if (!authenticated || !user || !embeddedWallet) throw missingIdentityError();
-    const didToken = await getAccessToken();
-    if (!didToken) throw new Error("Privy session token is unavailable. Please sign in again.");
+    if (!connected || !userInfo) throw missingIdentityError();
+    const evmAddress = address || (await enable());
+    if (!evmAddress) throw missingIdentityError();
     return {
-      didToken,
-      issuer: user.id,
-      email: emailFor(user),
-      evmAddress: embeddedWallet.address.toLowerCase(),
-      solanaAddress: null,
+      didToken: encodeParticleSession(userInfo),
+      issuer: `particle:${userInfo.uuid}`,
+      email: emailFor(userInfo),
+      evmAddress: evmAddress.toLowerCase(),
+      solanaAddress: solanaAddressFor(userInfo),
     };
-  }, [authenticated, embeddedWallet, getAccessToken, user]);
-
-  useEffect(() => {
-    if (
-      !ready ||
-      !authenticated ||
-      !user ||
-      !walletsReady ||
-      embeddedWallet ||
-      creatingWallet.current
-    ) {
-      return;
-    }
-    creatingWallet.current = true;
-    createWallet()
-      .catch((error) => {
-        console.error("Privy embedded wallet creation failed:", error);
-      })
-      .finally(() => {
-        creatingWallet.current = false;
-      });
-  }, [authenticated, createWallet, embeddedWallet, ready, user, walletsReady]);
+  }, [address, connected, enable, userInfo]);
 
   useEffect(() => {
     let active = true;
-    if (!ready || !authenticated || !user) {
+    if (!connected || !userInfo) {
       setIdentity(null);
       return;
     }
-    if (!embeddedWallet) return;
     buildIdentity()
       .then((next) => {
         if (active) setIdentity(next);
       })
       .catch((error) => {
-        console.error("Privy identity refresh failed:", error);
+        console.error("Particle identity refresh failed:", error);
         if (active) setIdentity(null);
       });
     return () => {
       active = false;
     };
-  }, [authenticated, buildIdentity, embeddedWallet, ready, user]);
+  }, [buildIdentity, connected, userInfo]);
 
   const refreshIdentity = useCallback(async () => {
     const next = await buildIdentity();
@@ -119,33 +111,47 @@ function FyoraAuthProviderInner({ children }: { children: ReactNode }) {
 
   const signInWithEmail = useCallback(
     async (email: string) => {
-      login({
-        loginMethods: ["email", "google"],
-        prefill: email ? { type: "email", value: email } : undefined,
-      });
+      await connect(email ? { email } : undefined);
     },
-    [login],
+    [connect],
   );
 
   const signInWithGoogle = useCallback(async () => {
-    login({ loginMethods: ["google", "email"] });
-  }, [login]);
+    await connect({ socialType: "google", prompt: "select_account" });
+  }, [connect]);
 
   const signOut = useCallback(async () => {
-    await logout();
+    await disconnect();
     setIdentity(null);
-  }, [logout]);
+  }, [disconnect]);
+
+  const openWallet = useCallback(() => {
+    openParticleWallet({ windowSize: "small", topMenuType: "close" });
+  }, [openParticleWallet]);
 
   const value = useMemo(
     () => ({
       identity,
-      loading: !ready || (authenticated && !identity),
+      loading:
+        connectionStatus === "loading" ||
+        connectionStatus === "connecting" ||
+        (connected && !identity),
       signInWithEmail,
       signInWithGoogle,
       refreshIdentity,
       signOut,
+      openWallet,
     }),
-    [authenticated, identity, ready, refreshIdentity, signInWithEmail, signInWithGoogle, signOut],
+    [
+      connected,
+      connectionStatus,
+      identity,
+      openWallet,
+      refreshIdentity,
+      signInWithEmail,
+      signInWithGoogle,
+      signOut,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
@@ -153,25 +159,49 @@ function FyoraAuthProviderInner({ children }: { children: ReactNode }) {
 
 export function FyoraAuthProvider({ children }: { children: ReactNode }) {
   return (
-    <PrivyProvider
-      appId={PRIVY_APP_ID}
-      config={{
-        loginMethods: ["email", "google"],
-        embeddedWallets: {
-          ethereum: {
-            createOnLogin: "all-users",
+    <AuthCoreContextProvider
+      options={{
+        projectId: env("VITE_PARTICLE_PROJECT_ID"),
+        clientKey: env("VITE_PARTICLE_CLIENT_KEY"),
+        appId: env("VITE_PARTICLE_APP_ID"),
+        chains: [base, arbitrum, mainnet, bsc, solana],
+        authTypes: [AuthType.email, AuthType.google],
+        themeType: "light",
+        fiatCoin: "USD",
+        language: "en",
+        promptSettingConfig: {
+          promptPaymentPasswordSettingWhenSign: false,
+        },
+        customStyle: {
+          projectName: "Fyora",
+          subtitle: "One login. One Universal Balance.",
+          logo: "https://www.fyora.app/fyora-favicon.png",
+          primaryBtnBorderRadius: 999,
+          modalBorderRadius: 24,
+          cardBorderRadius: 18,
+          theme: {
+            light: {
+              accentColor: "#C6F24E",
+              primaryBtnBackgroundColor: "#C6F24E",
+              primaryBtnColor: "#141313",
+              themeBackgroundColor: "#FBF7EE",
+              modalBackgroundColor: "#FBF7EE",
+              textColor: "#141313",
+              secondaryTextColor: "#625F58",
+              cardBorderColor: "#141313",
+              inputBorderColor: "#141313",
+              inputBackgroundColor: "#FFFDF7",
+            },
           },
         },
-        appearance: {
-          walletChainType: "ethereum-only",
-          accentColor: "#C6F24E",
-          landingHeader: "Sign in to Fyora",
-          loginMessage: "Create your embedded wallet and pay from one Universal Balance.",
+        wallet: {
+          visible: false,
+          themeType: "light",
         },
       }}
     >
       <FyoraAuthProviderInner>{children}</FyoraAuthProviderInner>
-    </PrivyProvider>
+    </AuthCoreContextProvider>
   );
 }
 

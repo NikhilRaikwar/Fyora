@@ -56,7 +56,7 @@ export function PaymentSheet({
   const token = tokenById(creator.settlement.token);
   const signingSteps = useMemo(
     () => [
-      "Signing EIP-7702 authorization...",
+      "Confirming with Particle Auth...",
       "Routing across chains...",
       `Bridging to ${chain.name}...`,
       `Landing ${token.symbol}...`,
@@ -121,9 +121,9 @@ export function PaymentSheet({
     setConnecting(true);
     try {
       await signInWithEmail(email);
-      toast.success("Complete sign-in in the Privy modal.");
+      toast.success("Complete sign-in in the Particle modal.");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Privy sign-in failed.");
+      toast.error(error instanceof Error ? error.message : "Particle sign-in failed.");
     } finally {
       setConnecting(false);
     }
@@ -319,11 +319,11 @@ export function PaymentSheet({
                   >
                     {connecting ? (
                       <>
-                        <Loader2 className="w-4 h-4 animate-spin" /> Opening Privy...
+                        <Loader2 className="w-4 h-4 animate-spin" /> Opening Particle...
                       </>
                     ) : (
                       <>
-                        <Sparkles className="w-4 h-4" /> Continue with Privy
+                        <Sparkles className="w-4 h-4" /> Continue with Particle
                       </>
                     )}
                   </button>

@@ -114,7 +114,8 @@ export type Database = {
           handle: string;
           id: string;
           owner_evm_address: string;
-          owner_magic_issuer: string;
+          owner_magic_issuer: string | null;
+          owner_particle_uuid: string;
           owner_solana_address: string | null;
           published: boolean;
           socials: Json;
@@ -130,7 +131,8 @@ export type Database = {
           handle: string;
           id?: string;
           owner_evm_address: string;
-          owner_magic_issuer: string;
+          owner_magic_issuer?: string | null;
+          owner_particle_uuid: string;
           owner_solana_address?: string | null;
           published?: boolean;
           socials?: Json;
@@ -146,7 +148,8 @@ export type Database = {
           handle?: string;
           id?: string;
           owner_evm_address?: string;
-          owner_magic_issuer?: string;
+          owner_magic_issuer?: string | null;
+          owner_particle_uuid?: string;
           owner_solana_address?: string | null;
           published?: boolean;
           socials?: Json;

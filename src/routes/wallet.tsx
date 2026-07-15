@@ -102,7 +102,7 @@ function shortAddress(value: string) {
 }
 
 function WalletCenter() {
-  const { identity, loading } = useFyoraAuth();
+  const { identity, loading, openWallet } = useFyoraAuth();
   const { sendPaymentQuote } = useParticleSender();
   const navigate = useNavigate();
 
@@ -285,7 +285,7 @@ function WalletCenter() {
     receiveNetwork === "solana"
       ? "Solana Universal address"
       : receiveAddress.toLowerCase() === ownerAddress.toLowerCase()
-        ? "Privy EOA upgraded as Universal Account"
+        ? "Particle EOA upgraded as Universal Account"
         : "Separate Particle UA address";
   const receiveNetworks = activeAddresses?.solanaUaAddress
     ? (["evm", "solana"] as const)
@@ -311,14 +311,18 @@ function WalletCenter() {
             </div>
             <h1 className="mt-3 font-display text-4xl italic sm:text-6xl">Wallet center</h1>
             <p className="mt-2 max-w-xl text-sm text-muted-foreground sm:text-base">
-              One Universal Balance across supported chains, with Privy securing the embedded EOA
+              One Universal Balance across supported chains, with Particle securing the embedded EOA
               and Particle routing every transfer.
             </p>
           </div>
-          <div className="inline-flex items-center gap-2 rounded-full bg-card chunky shadow-sticker-sm px-4 py-2 text-sm font-semibold">
+          <button
+            type="button"
+            onClick={openWallet}
+            className="inline-flex items-center gap-2 rounded-full bg-card chunky shadow-sticker-sm px-4 py-2 text-sm font-semibold press"
+          >
             <ShieldCheck className="h-4 w-4" />
-            Powered by Privy + Particle
-          </div>
+            Open Particle Wallet
+          </button>
         </div>
 
         <section className="mt-8 grid gap-4 lg:grid-cols-[1.4fr_1fr]">
@@ -354,7 +358,7 @@ function WalletCenter() {
               <h2 className="font-display text-2xl italic">Receive</h2>
             </div>
             <p className="mt-1 text-xs text-muted-foreground">
-              Funds arrive here. Privy signs sends because it owns this Universal Account.
+              Funds arrive here. Particle signs sends because it owns this Universal Account.
             </p>
             <div className="mt-4 inline-flex rounded-full bg-secondary p-1 chunky">
               {receiveNetworks.map((network) => (
@@ -490,7 +494,7 @@ function WalletCenter() {
               <h2 className="font-display text-3xl italic">Send anywhere</h2>
             </div>
             <p className="mt-1 text-sm text-muted-foreground">
-              This sends from your Universal Balance, confirmed by Privy.
+              This sends from your Universal Balance, confirmed by Particle.
             </p>
             <p className="mt-2 text-xs text-muted-foreground">
               Keep extra balance for Particle routing fees. For a demo, fund about $0.20 on Base
@@ -607,7 +611,7 @@ function WalletCenter() {
                     <ShieldCheck className="h-4 w-4" />
                   )}
                   {stage === "signing"
-                    ? "Confirm with Privy"
+                    ? "Confirm with Particle"
                     : stage === "submitting"
                       ? "Submitting"
                       : stage === "pending"
@@ -645,7 +649,7 @@ function TransferStatus({ stage, universalXUrl }: { stage: TransferStage; univer
     idle: "",
     quoting: "Building quote",
     quoted: "Quote ready",
-    signing: "Waiting for Privy confirmation",
+    signing: "Waiting for Particle confirmation",
     submitting: "Submitting to Particle",
     pending: "Transfer pending",
     confirmed: "Transfer confirmed",

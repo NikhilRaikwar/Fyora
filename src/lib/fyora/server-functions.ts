@@ -31,7 +31,7 @@ const socialSchema = z.object({
 });
 
 async function identityFor(didToken: string) {
-  const { verifyFyoraIdentity } = await import("./privy.server");
+  const { verifyFyoraIdentity } = await import("./particle-auth.server");
   return verifyFyoraIdentity(didToken);
 }
 

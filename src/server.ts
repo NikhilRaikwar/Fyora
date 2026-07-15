@@ -61,7 +61,7 @@ export default {
         const newHeaders = new Headers(normalized.headers);
         newHeaders.set(
           "content-security-policy",
-          csp.replace("script-src", "script-src 'wasm-unsafe-eval'")
+          csp.replace("script-src", "script-src 'wasm-unsafe-eval'"),
         );
         return new Response(normalized.body, {
           status: normalized.status,

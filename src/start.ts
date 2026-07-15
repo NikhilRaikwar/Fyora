@@ -34,7 +34,7 @@ const cspMiddleware = createMiddleware().server(async ({ next }) => {
       const newHeaders = new Headers(response.headers);
       newHeaders.set(
         "content-security-policy",
-        csp.replace("script-src", "script-src 'wasm-unsafe-eval'")
+        csp.replace("script-src", "script-src 'wasm-unsafe-eval'"),
       );
       return new Response(response.body, {
         status: response.status,

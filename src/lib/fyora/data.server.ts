@@ -119,7 +119,7 @@ async function loadCreator(profile: ProfileRow, includePrivatePayments = false) 
 
 async function updateProfileOwner(profile: ProfileRow, identity: FyoraIdentity) {
   if (
-    profile.owner_magic_issuer === identity.issuer &&
+    profile.owner_particle_uuid === identity.issuer &&
     profile.owner_evm_address === identity.evmAddress &&
     profile.owner_solana_address === identity.solanaAddress
   ) {
@@ -128,7 +128,7 @@ async function updateProfileOwner(profile: ProfileRow, identity: FyoraIdentity) 
   const { data, error } = await getSupabaseServerClient()
     .from("profiles")
     .update({
-      owner_magic_issuer: identity.issuer,
+      owner_particle_uuid: identity.issuer,
       owner_evm_address: identity.evmAddress,
       owner_solana_address: identity.solanaAddress,
       updated_at: new Date().toISOString(),
@@ -167,7 +167,7 @@ export async function getCreatorForIdentity(identity: FyoraIdentity) {
   const { data, error } = await supabase
     .from("profiles")
     .select("*")
-    .eq("owner_magic_issuer", identity.issuer)
+    .eq("owner_particle_uuid", identity.issuer)
     .maybeSingle();
   if (error) throw error;
   if (data) return loadCreator(data, true);
@@ -229,7 +229,7 @@ export async function claimCreator(input: {
   const { data: profile, error } = await supabase
     .from("profiles")
     .insert({
-      owner_magic_issuer: input.identity.issuer,
+      owner_particle_uuid: input.identity.issuer,
       owner_evm_address: input.identity.evmAddress,
       owner_solana_address: input.identity.solanaAddress,
       handle: input.handle,
@@ -270,7 +270,7 @@ export async function updateCreator(input: {
     .from("profiles")
     .update({ display_name: input.name, bio: input.bio, avatar_emoji: input.emoji })
     .eq("id", current.profileId)
-    .eq("owner_magic_issuer", input.identity.issuer);
+    .eq("owner_particle_uuid", input.identity.issuer);
   if (profileError) throw profileError;
   const { error: settlementError } = await supabase
     .from("settlement_configs")
@@ -304,7 +304,7 @@ export async function refreshCreatorShareCard(identity: FyoraIdentity) {
     .from("profiles")
     .update({ updated_at: new Date().toISOString() })
     .eq("id", current.profileId)
-    .eq("owner_magic_issuer", identity.issuer);
+    .eq("owner_particle_uuid", identity.issuer);
   if (error) throw error;
   return getCreatorForIdentity(identity);
 }
@@ -338,7 +338,7 @@ export async function updateCreatorAvatar(input: {
     .from("profiles")
     .update({ avatar_url: data.publicUrl })
     .eq("id", current.profileId)
-    .eq("owner_magic_issuer", input.identity.issuer);
+    .eq("owner_particle_uuid", input.identity.issuer);
   if (profileError) throw profileError;
   return getCreatorForIdentity(input.identity);
 }
