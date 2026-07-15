@@ -12,7 +12,6 @@ export type AuthContextValue = {
   identity: FyoraIdentity | null;
   loading: boolean;
   signInWithEmail: (email: string) => Promise<void>;
-  signInWithGoogle: () => Promise<void>;
   refreshIdentity: () => Promise<FyoraIdentity>;
   signOut: () => Promise<void>;
   openWallet: () => Promise<void>;
@@ -29,7 +28,6 @@ function createFallbackValue(): AuthContextValue {
     identity: null,
     loading: true,
     signInWithEmail: unavailable,
-    signInWithGoogle: unavailable,
     refreshIdentity: unavailable,
     signOut: unavailable,
     openWallet: unavailable,

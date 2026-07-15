@@ -48,7 +48,7 @@ export function PaymentSheet({
   const [confirmed, setConfirmed] = useState(false);
   const [supporterEmoji, setSupporterEmoji] = useState(SUPPORTER_EMOJIS[0]);
   const [idempotencyKey, setIdempotencyKey] = useState("");
-  const { identity, refreshIdentity, signInWithEmail, signInWithGoogle } = useFyoraAuth();
+  const { identity, refreshIdentity, signInWithEmail } = useFyoraAuth();
   const { sendPaymentQuote } = useParticleSender();
   const router = useRouter();
 
@@ -127,10 +127,6 @@ export function PaymentSheet({
     } finally {
       setConnecting(false);
     }
-  };
-
-  const handleGoogleLogin = async () => {
-    await signInWithGoogle();
   };
 
   useEffect(() => {
@@ -326,13 +322,6 @@ export function PaymentSheet({
                         <Sparkles className="w-4 h-4" /> Continue with Particle
                       </>
                     )}
-                  </button>
-                  <div className="text-center text-xs text-muted-foreground">or</div>
-                  <button
-                    onClick={handleGoogleLogin}
-                    className="w-full rounded-full bg-card py-3 font-semibold chunky shadow-sticker-sm press flex items-center justify-center gap-2"
-                  >
-                    <Sparkles className="w-4 h-4" /> Continue with Google
                   </button>
                 </div>
               </StepWrap>

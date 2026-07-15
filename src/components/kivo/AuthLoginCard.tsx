@@ -3,16 +3,10 @@ import { Loader2, Mail, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { useFyoraAuth } from "@/lib/fyora/AuthProvider";
 
-export function AuthLoginCard({
-  title = "Sign in to Fyora",
-  showGoogle = true,
-}: {
-  title?: string;
-  showGoogle?: boolean;
-}) {
+export function AuthLoginCard({ title = "Sign in to Fyora" }: { title?: string }) {
   const [email, setEmail] = useState("");
   const [working, setWorking] = useState(false);
-  const { signInWithEmail, signInWithGoogle } = useFyoraAuth();
+  const { signInWithEmail } = useFyoraAuth();
 
   const emailLogin = async () => {
     setWorking(true);
@@ -22,14 +16,6 @@ export function AuthLoginCard({
       toast.error(error instanceof Error ? error.message : "Particle sign-in failed.");
     } finally {
       setWorking(false);
-    }
-  };
-
-  const googleLogin = async () => {
-    try {
-      await signInWithGoogle();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Particle sign-in failed.");
     }
   };
 
@@ -59,14 +45,6 @@ export function AuthLoginCard({
         {working ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
         Continue with Particle
       </button>
-      {showGoogle && (
-        <button
-          onClick={googleLogin}
-          className="w-full rounded-full bg-card py-3 font-semibold chunky shadow-sticker-sm press flex items-center justify-center gap-2"
-        >
-          <Sparkles className="w-4 h-4" /> Continue with Google
-        </button>
-      )}
     </div>
   );
 }

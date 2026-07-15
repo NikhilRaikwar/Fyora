@@ -6,94 +6,178 @@
   </a>
 </p>
 
-Fyora is a creator money page for chain-abstracted support. A creator shares one link, supporters pay from a Particle Universal Balance, and the creator receives on the destination chain and token they choose.
+**Fyora is a chain-abstracted creator money page.** A creator shares one link, supporters pay from any supported chain through Particle Universal Accounts, and the creator receives on the chain/token they chose.
 
 - Live app: [fyora.app](https://www.fyora.app/)
+- Example profile: [fyora.app/nikhil](https://www.fyora.app/nikhil)
 - Social: [x.com/getfyora](https://x.com/getfyora)
 
 <p align="center">
-  <img src="./public/fyora-share-nikhil.jpg" alt="Example Fyora creator card" width="820" />
+  <img src="./public/fyora-share-nikhil.jpg" alt="Example Fyora creator share card" width="820" />
 </p>
 
-## What It Does
+## What Fyora Does
 
-1. Creators and supporters sign in with Particle email or Google.
-2. Particle Auth creates the user-owned EOA and wallet session.
-3. Particle Universal Accounts upgrades that EOA in EIP-7702 mode.
-4. Creators claim `fyora.app/{handle}`, add a bio/photo, and choose settlement.
-5. Fyora generates a real PNG social card for each handle at `/api/public/og/{handle}.png`.
-6. Supporters choose an amount and pay without manual bridging or chain switching.
-7. Particle Auth signs the Universal Account transaction root.
-8. Particle executes the route and Fyora records confirmed payments in Supabase.
+1. A creator signs in with Particle email.
+2. Particle creates a user-owned EOA.
+3. Particle Universal Accounts upgrades that EOA in place with **EIP-7702**.
+4. The creator claims `fyora.app/{handle}`.
+5. The creator chooses where funds should land, for example Base USDC or Arbitrum USDC.
+6. Fyora stores the creator page, settlement config, avatar, and payments in Supabase.
+7. Supporters open the creator link and pay from their Universal Balance.
+8. Particle routes the payment across chains and returns UniversalX proof.
+9. Fyora verifies and records confirmed payments for dashboard metrics.
 
-## Stack
+## Architecture
 
-- TanStack Start, React, TypeScript, Vite
-- Particle AuthKit for email/Google auth and wallet modal
-- Particle Universal Accounts SDK in EIP-7702 mode
-- Supabase Postgres and Storage for creator/payment data
-- Satori and resvg WASM for dynamic PNG social cards
-- qrcode.react for share and receive QR codes
-- Vercel Analytics
+```mermaid
+flowchart TD
+  Supporter["👤 Supporter"]:::person
+  Creator["🎨 Creator"]:::person
+  Auth["🔐 Particle Auth<br/>Email OTP"]:::particle
+  EOA["🧾 User-owned EOA"]:::wallet
+  UA["🌐 Particle Universal Account<br/>EIP-7702 mode"]:::particle
+  Balance["💰 Universal Balance<br/>getPrimaryAssets()"]:::money
+  Quote["🧭 Route + quote<br/>createTransferTransaction()"]:::route
+  Sign["✍️ Particle signing<br/>root hash confirmation"]:::wallet
+  Send["🚀 sendTransaction()"]:::particle
+  UniversalX["🔎 UniversalX proof"]:::proof
+  Supabase["🗄️ Supabase<br/>profiles, settlement, payments, avatars"]:::db
+  OG["🖼️ Dynamic PNG cards<br/>/api/public/og/{handle}.png"]:::media
+
+  Creator --> Auth --> EOA --> UA
+  Supporter --> Auth
+  UA --> Balance --> Quote --> Sign --> Send --> UniversalX
+  Send --> Supabase
+  Creator --> Supabase
+  Supabase --> OG
+
+  classDef person fill:#fff7d6,stroke:#141313,stroke-width:3px,color:#141313;
+  classDef particle fill:#d9ccff,stroke:#141313,stroke-width:3px,color:#141313;
+  classDef wallet fill:#c6f24e,stroke:#141313,stroke-width:3px,color:#141313;
+  classDef money fill:#d7fff1,stroke:#141313,stroke-width:3px,color:#141313;
+  classDef route fill:#ffd166,stroke:#141313,stroke-width:3px,color:#141313;
+  classDef proof fill:#ff7a59,stroke:#141313,stroke-width:3px,color:#141313;
+  classDef db fill:#cce7ff,stroke:#141313,stroke-width:3px,color:#141313;
+  classDef media fill:#ffe1f0,stroke:#141313,stroke-width:3px,color:#141313;
+```
+
+## Payment Flow
+
+```mermaid
+sequenceDiagram
+  participant S as 👤 Supporter
+  participant F as ⚡ Fyora
+  participant P as 🌐 Particle UA
+  participant X as 🔎 UniversalX
+  participant DB as 🗄️ Supabase
+  participant C as 🎨 Creator
+
+  S->>F: Open fyora.app/{handle}
+  F->>DB: Load creator + settlement address
+  S->>F: Choose amount and confirm
+  F->>P: createTransferTransaction()
+  P-->>F: Route, fees, root hash
+  S->>P: Sign with Particle Auth EOA
+  F->>P: sendTransaction()
+  P-->>X: Execute cross-chain operation
+  X-->>F: Transaction id / proof link
+  F->>DB: Record submitted + confirmed payment
+  DB-->>C: Dashboard metrics update
+```
 
 ## Wallet Model
 
-- **Particle Auth EOA**: the user-owned signing wallet created on login.
-- **Universal receive address**: the address shown on `/wallet` for demo deposits and Universal Balance funding.
-- **Universal Balance**: read from Particle `getPrimaryAssets()`.
-- **Transfers**: built with Particle `createTransferTransaction()` and submitted with Particle `sendTransaction()`.
+- **Particle Auth EOA**: the user-owned wallet created through Particle login.
+- **EIP-7702 Universal Account**: Particle upgrades the EOA in place, so the signer and EVM receive address can be the same address.
+- **Universal receive address**: the address shown on `/wallet`; direct deposits such as Base USDC can be sent here.
+- **Universal Balance**: loaded from Particle `getPrimaryAssets()`.
+- **Direct RPC fallback**: Fyora also checks supported EVM chains directly, so fresh deposits can appear while Particle indexing catches up.
+- **Transfers**: built with `createTransferTransaction()` and submitted through Particle after user confirmation.
 
-For demo funding, send a tiny amount of Base USDC plus a small amount of Base ETH to the EVM Universal receive address shown on `/wallet`, then refresh. In EIP-7702 mode, the receive address and signer address can be the same EOA because the account is upgraded in place.
+For demo funding, send a small amount of **Base USDC** plus a little **Base ETH** to the EVM Universal receive address shown on `/wallet`. The USDC is the payment amount; ETH gives enough gas/fee room for routing.
 
-```mermaid
-flowchart LR
-  User["Creator or supporter"] --> Auth["Particle email / Google login"]
-  Auth --> EOA["Particle Auth EOA"]
-  EOA --> UA["Particle Universal Account (EIP-7702)"]
-  UA --> Balance["Universal Balance via getPrimaryAssets()"]
-  Balance --> Quote["createTransferTransaction()"]
-  Quote --> Sign["Particle Auth signs root hash"]
-  Sign --> Send["Particle sendTransaction()"]
-  Send --> Proof["UniversalX transaction proof"]
-  Send --> Supabase["Supabase confirmed payment record"]
-```
+## Supported Demo Assets
+
+Fyora’s primary demo assets are aligned with the Particle UA primary asset set used in the app:
+
+- USDC
+- USDT
+- ETH
+- BNB
+- SOL
+
+The current production demo is safest with **Base USDC** as the funding asset and **Base or Arbitrum USDC** as the creator settlement target.
 
 ## Dynamic Share Cards
 
-Every public profile emits absolute, versioned metadata:
+Every public profile includes absolute, versioned social metadata:
+
+<p align="center">
+  <img src="./public/fyora-share-nikhil.jpg" alt="Fyora generated creator card example" width="820" />
+</p>
 
 ```text
 https://www.fyora.app/api/public/og/{handle}.png?v={updatedAt}
 ```
 
-The card renderer uses Supabase profile data, the creator photo when uploaded, and an emoji/gradient fallback. It returns `image/png` for social crawlers.
+The PNG card renderer uses:
 
-```mermaid
-sequenceDiagram
-  participant Crawler as Social crawler
-  participant Profile as fyora.app/{handle}
-  participant OG as /api/public/og/{handle}.png
-  participant DB as Supabase profile data
+- Supabase profile data
+- creator name, handle, bio, gradient, and avatar/photo
+- bundled fonts and WASM rendering assets
+- `1200x630` PNG output for X, Discord, LinkedIn, WhatsApp, iMessage, and other crawlers
 
-  Crawler->>Profile: Request shared creator link
-  Profile-->>Crawler: Absolute og:image + twitter:image
-  Crawler->>OG: Fetch PNG card
-  OG->>DB: Load creator name, handle, photo, bio
-  OG-->>Crawler: 1200x630 image/png
-```
+Dashboard also includes a share-card refresh action so creators can update the generated image after profile edits.
 
 ## Supabase Data
 
-Supabase stores:
+Supabase is used as the production database, not as the auth provider.
 
-- Particle user UUID and EVM/Solana wallet linkage
-- Creator handles, profile text, emoji, gradient, uploaded photo URL
-- Settlement chain/token/address
-- Payment intents and confirmed transaction receipts
+Stored data includes:
 
-Supabase Auth is not used. Protected profile mutations are authorized by validating the Particle session server-side.
+- Particle UUID, verified owner email, EVM address, and optional Solana address
+- creator handles, bios, avatars, gradients, and socials
+- settlement chain, token, decimals, and Universal receive address
+- payment intents, status, Particle transaction id, UniversalX link, and confirmation data
 
-## Local Setup
+Server functions validate Particle sessions before protected profile or payment operations.
+
+## Tech Stack
+
+- TanStack Start, React, TypeScript, Vite
+- Particle AuthKit
+- Particle Universal Accounts SDK
+- Supabase Postgres and Storage
+- Satori + resvg WASM for PNG cards
+- qrcode.react for profile and receive QR codes
+- Vercel Analytics
+
+## Environment
+
+```env
+VITE_FYORA_PUBLIC_URL=https://www.fyora.app
+
+VITE_PARTICLE_PROJECT_ID=
+VITE_PARTICLE_CLIENT_KEY=
+VITE_PARTICLE_APP_ID=
+PARTICLE_SERVER_KEY=
+PARTICLE_RPC_URL=https://universal-rpc-proxy.particle.network
+
+SUPABASE_URL=
+SUPABASE_SECRET_KEY=
+
+VITE_ETHEREUM_RPC_URL=
+VITE_BNB_RPC_URL=
+VITE_BASE_RPC_URL=
+VITE_ARBITRUM_RPC_URL=
+VITE_XLAYER_RPC_URL=
+VITE_SOLANA_RPC_URL=
+```
+
+Server-only secrets must not use `VITE_`.
+
+## Local Development
 
 ```bash
 npm install
@@ -101,57 +185,43 @@ copy .env.example .env.local
 npm run dev -- --port 3000
 ```
 
-Required environment variables:
-
-```env
-VITE_FYORA_PUBLIC_URL=http://localhost:3000
-
-VITE_PARTICLE_PROJECT_ID=
-VITE_PARTICLE_CLIENT_KEY=
-VITE_PARTICLE_APP_ID=
-PARTICLE_SERVER_KEY=
-
-SUPABASE_URL=
-SUPABASE_SECRET_KEY=
-```
-
-Server-only secrets must not use `VITE_`.
-
-## Database
-
-Apply the Supabase migrations in `supabase/migrations/`.
-
-The Particle reset migration:
-
-- Adds `profiles.owner_particle_uuid`.
-- Makes the legacy `owner_magic_issuer` nullable for compatibility.
-- Clears demo `payments`, `settlement_configs`, and `profiles` rows.
-- Keeps creator photo support through the public `creator-avatars` storage bucket.
-
-## Demo Script
-
-1. Sign in with Particle email or Google.
-2. Claim a fresh handle such as `nikhil` or `codebreakers`.
-3. Upload a creator photo and save.
-4. Share `https://www.fyora.app/{handle}` and show the generated PNG preview.
-5. Open `/wallet`.
-6. Copy the EVM Universal receive address.
-7. Fund a tiny amount of Base USDC and Base ETH.
-8. Refresh `/wallet` and show Particle Universal Balance.
-9. Open a creator page from another session and send a small support payment.
-10. Confirm with Particle Auth and open the UniversalX transaction link.
-
-## Commands
+Run checks:
 
 ```bash
 npm run lint
 npm run build
 ```
 
-## Docs
+## Database Setup
 
-- [Particle Auth Web](https://developers.particle.network/social-logins/auth/desktop-sdks/web)
-- [Particle Auth quickstart](https://developers.particle.network/social-logins/auth/quickstart/web-quickstart)
-- [Particle wallet widget](https://developers.particle.network/social-logins/configuration/appearance/wallet)
-- [Particle Universal Accounts overview](https://developers.particle.network/universal-accounts/cha/overview)
-- [Particle UA transfer docs](https://developers.particle.network/universal-accounts/ua-reference/web/transactions/transfer)
+Apply the migrations in `supabase/migrations/`.
+
+Important migrations:
+
+- Core creator, settlement, and payment tables
+- Creator avatar storage support
+- Particle auth reset and `owner_particle_uuid`
+- Particle email ownership metadata for creator recovery and support
+
+## Demo Steps
+
+1. Open [fyora.app](https://www.fyora.app/).
+2. Sign in with Particle email.
+3. Claim a creator page.
+4. Upload a profile photo and save settlement, preferably Base USDC or Arbitrum USDC.
+5. Open `/wallet`.
+6. Copy the EVM Universal receive address.
+7. Send around `0.20 USDC` on Base and a tiny amount of Base ETH.
+8. Refresh `/wallet` and show Universal Balance/direct deposit detection.
+9. Open another creator page.
+10. Send a tiny support payment, such as `$0.01`.
+11. Confirm with Particle.
+12. Open the UniversalX link as proof of the Universal Account operation.
+
+## Particle Docs
+
+- [Particle Developer Docs](https://developers.particle.network/)
+- [Universal Accounts Overview](https://developers.particle.network/universal-accounts/cha/overview)
+- [Universal Accounts Web Quickstart](https://developers.particle.network/universal-accounts/cha/web-quickstart)
+- [Universal Accounts Transfer Reference](https://developers.particle.network/universal-accounts/ua-reference/web/transactions/transfer)
+- [Particle Auth Web SDK](https://developers.particle.network/social-logins/auth/desktop-sdks/web)

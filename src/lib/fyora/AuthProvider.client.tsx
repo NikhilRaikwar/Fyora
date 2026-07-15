@@ -109,10 +109,6 @@ function FyoraAuthProviderInner({ children }: { children: ReactNode }) {
     [connect],
   );
 
-  const signInWithGoogle = useCallback(async () => {
-    await connect({ socialType: "google", prompt: "select_account" });
-  }, [connect]);
-
   const signOut = useCallback(async () => {
     await disconnect();
     setIdentity(null);
@@ -140,21 +136,11 @@ function FyoraAuthProviderInner({ children }: { children: ReactNode }) {
         connectionStatus === "connecting" ||
         (connected && !identity),
       signInWithEmail,
-      signInWithGoogle,
       refreshIdentity,
       signOut,
       openWallet,
     }),
-    [
-      connected,
-      connectionStatus,
-      identity,
-      openWallet,
-      refreshIdentity,
-      signInWithEmail,
-      signInWithGoogle,
-      signOut,
-    ],
+    [connected, connectionStatus, identity, openWallet, refreshIdentity, signInWithEmail, signOut],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
@@ -168,7 +154,7 @@ export default function ParticleAuthProvider({ children }: { children: ReactNode
         clientKey: env("VITE_PARTICLE_CLIENT_KEY"),
         appId: env("VITE_PARTICLE_APP_ID"),
         chains: [base, arbitrum, mainnet, bsc, solana],
-        authTypes: [AuthType.email, AuthType.google],
+        authTypes: [AuthType.email],
         themeType: "light",
         fiatCoin: "USD",
         language: "en",

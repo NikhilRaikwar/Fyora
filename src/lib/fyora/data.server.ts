@@ -187,17 +187,7 @@ export async function getCreatorForIdentity(identity: FyoraIdentity) {
     .maybeSingle();
   if (evmError) throw evmError;
   if (evmProfile) return loadCreator(await updateProfileOwner(evmProfile, identity), true);
-
-  const ownerEmail = normalizedEmail(identity.email);
-  if (!ownerEmail) return null;
-  const { data: emailProfile, error: emailError } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("owner_email", ownerEmail)
-    .maybeSingle();
-  if (emailError) throw emailError;
-  if (!emailProfile) return null;
-  return loadCreator(await updateProfileOwner(emailProfile, identity), true);
+  return null;
 }
 
 function receiverFor(asset: SettlementAsset, addresses: UniversalSettlementAddresses) {
