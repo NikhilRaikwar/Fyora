@@ -24,7 +24,7 @@ type AuthContextValue = {
   signInWithGoogle: () => Promise<void>;
   refreshIdentity: () => Promise<FyoraIdentity>;
   signOut: () => Promise<void>;
-  openWallet: () => void;
+  openWallet: () => Promise<void>;
 };
 
 type ParticleWalletInfo = {
@@ -137,8 +137,18 @@ function FyoraAuthProviderInner({ children }: { children: ReactNode }) {
     setIdentity(null);
   }, [disconnect]);
 
-  const openWallet = useCallback(() => {
-    openParticleWallet({ windowSize: "small", topMenuType: "close" });
+  const openWallet = useCallback(async () => {
+    try {
+      await openParticleWallet({ windowSize: "small", topMenuType: "close" });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Particle Wallet could not open.";
+      if (message.toLowerCase().includes("wallet entry is not activated")) {
+        throw new Error(
+          "Particle Wallet is not activated for this project. Enable Wallet/Wallet Entry in the Particle Dashboard, then redeploy or refresh.",
+        );
+      }
+      throw error;
+    }
   }, [openParticleWallet]);
 
   const value = useMemo(

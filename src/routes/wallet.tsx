@@ -182,6 +182,14 @@ function WalletCenter() {
     setTransactionId("");
   };
 
+  const handleOpenWallet = async () => {
+    try {
+      await openWallet();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Particle Wallet could not open.");
+    }
+  };
+
   const validateTransfer = () => {
     if (!amount || !Number.isFinite(amountNumber) || amountNumber <= 0) {
       throw new Error("Enter a valid token amount.");
@@ -317,7 +325,7 @@ function WalletCenter() {
           </div>
           <button
             type="button"
-            onClick={openWallet}
+            onClick={handleOpenWallet}
             className="inline-flex items-center gap-2 rounded-full bg-card chunky shadow-sticker-sm px-4 py-2 text-sm font-semibold press"
           >
             <ShieldCheck className="h-4 w-4" />
