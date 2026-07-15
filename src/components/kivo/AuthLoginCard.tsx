@@ -3,7 +3,13 @@ import { Loader2, Mail, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { useFyoraAuth } from "@/lib/fyora/AuthProvider";
 
-export function AuthLoginCard({ title = "Sign in to Fyora" }: { title?: string }) {
+export function AuthLoginCard({
+  title = "Sign in to Fyora",
+  showGoogle = true,
+}: {
+  title?: string;
+  showGoogle?: boolean;
+}) {
   const [email, setEmail] = useState("");
   const [working, setWorking] = useState(false);
   const { signInWithEmail, signInWithGoogle } = useFyoraAuth();
@@ -32,7 +38,7 @@ export function AuthLoginCard({ title = "Sign in to Fyora" }: { title?: string }
       <div>
         <h2 className="font-display italic text-3xl">{title}</h2>
         <p className="text-sm text-muted-foreground mt-1">
-          Email or Google. Particle creates your embedded wallet.
+          Particle creates your embedded wallet and Universal Account.
         </p>
       </div>
       <div className="rounded-2xl chunky bg-lilac/30 p-4 flex items-center gap-2">
@@ -53,12 +59,14 @@ export function AuthLoginCard({ title = "Sign in to Fyora" }: { title?: string }
         {working ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
         Continue with Particle
       </button>
-      <button
-        onClick={googleLogin}
-        className="w-full rounded-full bg-card py-3 font-semibold chunky shadow-sticker-sm press flex items-center justify-center gap-2"
-      >
-        <Sparkles className="w-4 h-4" /> Continue with Google
-      </button>
+      {showGoogle && (
+        <button
+          onClick={googleLogin}
+          className="w-full rounded-full bg-card py-3 font-semibold chunky shadow-sticker-sm press flex items-center justify-center gap-2"
+        >
+          <Sparkles className="w-4 h-4" /> Continue with Google
+        </button>
+      )}
     </div>
   );
 }

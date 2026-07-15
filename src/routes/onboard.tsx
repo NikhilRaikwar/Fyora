@@ -174,7 +174,7 @@ function Onboard() {
       <div className="min-h-screen bg-paper text-ink">
         <Header />
         <div className="px-4 py-16">
-          <AuthLoginCard title="Sign in to claim your page" />
+          <AuthLoginCard title="Sign in to claim your page" showGoogle={false} />
         </div>
       </div>
     );

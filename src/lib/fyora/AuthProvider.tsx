@@ -27,6 +27,11 @@ type AuthContextValue = {
   openWallet: () => void;
 };
 
+type ParticleWalletInfo = {
+  chain_name?: string;
+  public_address?: string;
+};
+
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 function env(name: string) {
@@ -47,9 +52,16 @@ function emailFor(userInfo: UserInfo) {
 }
 
 function solanaAddressFor(userInfo: UserInfo) {
+  return walletAddressFor(userInfo, "solana");
+}
+
+function walletAddressFor(userInfo: UserInfo, chainName: "evm_chain" | "solana") {
+  const wallets = (userInfo.wallets ?? []) as ParticleWalletInfo[];
   return (
-    userInfo.wallets.find((wallet) => wallet.chain_name === "solana")?.public_address?.trim() ??
-    null
+    wallets
+      .find((wallet) => wallet.chain_name === chainName)
+      ?.public_address?.trim()
+      .toLowerCase() ?? null
   );
 }
 
@@ -73,7 +85,7 @@ function FyoraAuthProviderInner({ children }: { children: ReactNode }) {
 
   const buildIdentity = useCallback(async (): Promise<FyoraIdentity> => {
     if (!connected || !userInfo) throw missingIdentityError();
-    const evmAddress = address || (await enable());
+    const evmAddress = address || walletAddressFor(userInfo, "evm_chain") || (await enable());
     if (!evmAddress) throw missingIdentityError();
     return {
       didToken: encodeParticleSession(userInfo),

@@ -420,6 +420,11 @@ function WalletCenter() {
                   <div className="mt-1 text-[11px] text-muted-foreground">
                     QR opens a wallet deposit URI. Copy address for exchanges or manual sends.
                   </div>
+                  {activeAddresses.lookupWarning && (
+                    <div className="mt-1 text-[11px] text-muted-foreground">
+                      Using the EIP-7702 owner address while Particle finishes UA address lookup.
+                    </div>
+                  )}
                   <CopyButton value={receiveAddress} label="Copy address" className="mt-3" />
                 </div>
               </div>

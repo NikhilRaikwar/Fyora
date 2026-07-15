@@ -24,6 +24,7 @@ export type UniversalAccountAddresses = {
   evmUaAddress: string;
   solanaUaAddress: string | null;
   mode: "separateSmartAccount" | "eip7702OwnerAddress";
+  lookupWarning?: string;
 };
 
 export const loadPrimaryAssets = createClientOnlyFn(
