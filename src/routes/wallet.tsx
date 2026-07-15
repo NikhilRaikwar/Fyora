@@ -21,6 +21,7 @@ import { AuthLoginCard } from "@/components/kivo/AuthLoginCard";
 import { useFyoraAuth } from "@/lib/fyora/AuthProvider";
 import {
   createWalletTransferQuote,
+  loadEvmOnchainBalances,
   loadUniversalAccountAddresses,
   loadPrimaryAssets,
   loadWalletActivity,
@@ -29,6 +30,7 @@ import {
 } from "@/lib/fyora/particle";
 import { useParticleSender } from "@/lib/fyora/useParticleSender";
 import { PRIMARY_ASSETS } from "@/lib/fyora/settlement";
+import type { FyoraIdentity } from "@/lib/fyora/types";
 
 export const Route = createFileRoute("/wallet")({
   head: () => ({
@@ -102,7 +104,6 @@ function shortAddress(value: string) {
 
 function WalletCenter() {
   const { identity, loading } = useFyoraAuth();
-  const { sendPaymentQuote } = useParticleSender();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -111,6 +112,26 @@ function WalletCenter() {
     }
   }, [loading, identity, navigate]);
 
+  if (loading) {
+    return <WalletLoading />;
+  }
+
+  if (!identity) {
+    return (
+      <div className="min-h-screen bg-paper text-ink">
+        <Header />
+        <div className="px-4 py-16">
+          <AuthLoginCard title="Sign in to open your wallet" />
+        </div>
+      </div>
+    );
+  }
+
+  return <AuthenticatedWalletCenter identity={identity} />;
+}
+
+function AuthenticatedWalletCenter({ identity }: { identity: FyoraIdentity }) {
+  const { sendPaymentQuote } = useParticleSender();
   const [receiveNetwork, setReceiveNetwork] = useState<"evm" | "solana">("evm");
   const [tokenId, setTokenId] = useState<(typeof TOKEN_IDS)[number]>("usdc");
   const [chainId, setChainId] = useState(8453);
@@ -141,8 +162,27 @@ function WalletCenter() {
   const activeAssets = assetsQuery.data;
   const activeAddresses = addressesQuery.data;
   const activeOwnerAddress = identity?.evmAddress ?? "";
+  const evmReceiveAddress = activeAddresses?.evmUaAddress ?? activeOwnerAddress;
   const activeLoading = assetsQuery.isLoading;
   const activeFetching = assetsQuery.isFetching;
+  const evmOnchainBalancesQuery = useQuery({
+    queryKey: ["evm-onchain-balances", evmReceiveAddress],
+    queryFn: () => loadEvmOnchainBalances(evmReceiveAddress),
+    enabled: Boolean(evmReceiveAddress),
+    retry: 1,
+    refetchInterval: 30_000,
+  });
+  const evmOnchainBalances = useMemo(
+    () => evmOnchainBalancesQuery.data ?? [],
+    [evmOnchainBalancesQuery.data],
+  );
+  const particleTotalUsd = activeAssets?.totalAmountInUSD ?? 0;
+  const onchainStableTotalUsd = evmOnchainBalances.reduce(
+    (sum, balance) => sum + balance.amountInUSD,
+    0,
+  );
+  const effectiveTotalUsd = particleTotalUsd > 0 ? particleTotalUsd : onchainStableTotalUsd;
+  const usingOnchainFallback = particleTotalUsd <= 0 && evmOnchainBalances.length > 0;
 
   const tokenAssets = useMemo(
     () => PRIMARY_ASSETS.filter((asset) => asset.tokenId === tokenId),
@@ -160,6 +200,29 @@ function WalletCenter() {
     const response = activeAssets;
     return TOKEN_IDS.map((id) => {
       const asset = response?.assets.find((entry) => tokenKey(entry.tokenType).includes(id));
+      const fallbackBalances = evmOnchainBalances.filter((balance) => balance.tokenId === id);
+      const fallbackAmount = fallbackBalances.reduce((sum, balance) => sum + balance.amount, 0);
+      const fallbackAmountInUSD = fallbackBalances.reduce(
+        (sum, balance) => sum + balance.amountInUSD,
+        0,
+      );
+      if ((!asset || asset.amount <= 0) && fallbackBalances.length) {
+        return {
+          id,
+          amount: fallbackAmount,
+          amountInUSD: fallbackAmountInUSD,
+          chains: fallbackBalances.map((balance) => ({
+            amount: balance.amount,
+            amountInUSD: balance.amountInUSD,
+            rawAmount: balance.rawAmount,
+            token: {
+              chainId: balance.chainId,
+              address: balance.tokenAddress,
+              decimals: balance.tokenDecimals,
+            },
+          })),
+        };
+      }
       return {
         id,
         amount: asset?.amount ?? 0,
@@ -167,7 +230,7 @@ function WalletCenter() {
         chains: (asset?.chainAggregation ?? []).filter((entry) => entry.amount > 0),
       };
     });
-  }, [activeAssets]);
+  }, [activeAssets, evmOnchainBalances]);
 
   useEffect(() => {
     if (receiveNetwork === "solana" && activeAddresses && !activeAddresses.solanaUaAddress) {
@@ -257,21 +320,6 @@ function WalletCenter() {
     }
   };
 
-  if (loading) {
-    return <WalletLoading />;
-  }
-
-  if (!identity) {
-    return (
-      <div className="min-h-screen bg-paper text-ink">
-        <Header />
-        <div className="px-4 py-16">
-          <AuthLoginCard title="Sign in to open your wallet" />
-        </div>
-      </div>
-    );
-  }
-
   const ownerAddress =
     receiveNetwork === "solana" ? (activeAddresses?.solanaUaAddress ?? "") : activeOwnerAddress;
   const receiveAddress =
@@ -322,10 +370,12 @@ function WalletCenter() {
               Universal Balance
             </div>
             <div className="mt-3 font-display text-5xl italic sm:text-7xl">
-              {activeLoading ? "..." : money(activeAssets?.totalAmountInUSD ?? 0)}
+              {activeLoading && !evmOnchainBalances.length ? "..." : money(effectiveTotalUsd)}
             </div>
             <p className="mt-3 text-sm text-paper/65">
-              Calculated by Particle across primary assets.
+              {usingOnchainFallback
+                ? "EVM deposits detected on-chain while Particle Universal Balance syncs."
+                : "Calculated by Particle across primary assets."}
             </p>
             <button
               type="button"
@@ -334,6 +384,7 @@ function WalletCenter() {
                   assetsQuery.refetch(),
                   addressesQuery.refetch(),
                   activityQuery.refetch(),
+                  evmOnchainBalancesQuery.refetch(),
                 ])
               }
               className="mt-6 inline-flex items-center gap-2 rounded-full bg-paper px-4 py-2 text-sm font-semibold text-ink chunky shadow-sticker-sm press"
@@ -341,6 +392,12 @@ function WalletCenter() {
               <RefreshCw className={`h-4 w-4 ${activeFetching ? "animate-spin" : ""}`} />
               Refresh
             </button>
+            {usingOnchainFallback && (
+              <div className="mt-4 rounded-2xl bg-paper/10 p-3 text-xs text-paper/70">
+                Particle has not indexed these deposits yet, but direct EVM RPCs show balances at
+                your Universal receive address.
+              </div>
+            )}
           </div>
 
           <div className="rounded-3xl bg-card p-6 chunky-thick shadow-sticker-lg">

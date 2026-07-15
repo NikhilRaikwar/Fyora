@@ -2,7 +2,11 @@ import { ClientOnly } from "@tanstack/react-router";
 import { createContext, lazy, Suspense, useContext, useMemo, type ReactNode } from "react";
 import type { FyoraIdentity } from "./types";
 
-const ParticleAuthProvider = lazy(() => import("./AuthProvider.client"));
+const ParticleAuthProvider = lazy(async () => {
+  const { installBrowserPolyfills } = await import("./browser-polyfills");
+  installBrowserPolyfills();
+  return import("./AuthProvider.client");
+});
 
 export type AuthContextValue = {
   identity: FyoraIdentity | null;
