@@ -18,6 +18,11 @@ type UniversalSettlementAddresses = {
   solanaUaAddress: string | null;
 };
 
+function normalizedEmail(email: string | null | undefined) {
+  const value = email?.trim().toLowerCase();
+  return value || null;
+}
+
 function asGradient(value: unknown): [string, string] {
   return Array.isArray(value) &&
     value.length === 2 &&
@@ -118,10 +123,12 @@ async function loadCreator(profile: ProfileRow, includePrivatePayments = false) 
 }
 
 async function updateProfileOwner(profile: ProfileRow, identity: FyoraIdentity) {
+  const ownerEmail = normalizedEmail(identity.email);
   if (
     profile.owner_particle_uuid === identity.issuer &&
     profile.owner_evm_address === identity.evmAddress &&
-    profile.owner_solana_address === identity.solanaAddress
+    profile.owner_solana_address === identity.solanaAddress &&
+    profile.owner_email === ownerEmail
   ) {
     return profile;
   }
@@ -131,6 +138,7 @@ async function updateProfileOwner(profile: ProfileRow, identity: FyoraIdentity) 
       owner_particle_uuid: identity.issuer,
       owner_evm_address: identity.evmAddress,
       owner_solana_address: identity.solanaAddress,
+      owner_email: ownerEmail,
       updated_at: new Date().toISOString(),
     })
     .eq("id", profile.id)
@@ -178,8 +186,18 @@ export async function getCreatorForIdentity(identity: FyoraIdentity) {
     .eq("owner_evm_address", identity.evmAddress)
     .maybeSingle();
   if (evmError) throw evmError;
-  if (!evmProfile) return null;
-  return loadCreator(await updateProfileOwner(evmProfile, identity), true);
+  if (evmProfile) return loadCreator(await updateProfileOwner(evmProfile, identity), true);
+
+  const ownerEmail = normalizedEmail(identity.email);
+  if (!ownerEmail) return null;
+  const { data: emailProfile, error: emailError } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("owner_email", ownerEmail)
+    .maybeSingle();
+  if (emailError) throw emailError;
+  if (!emailProfile) return null;
+  return loadCreator(await updateProfileOwner(emailProfile, identity), true);
 }
 
 function receiverFor(asset: SettlementAsset, addresses: UniversalSettlementAddresses) {
@@ -232,6 +250,7 @@ export async function claimCreator(input: {
       owner_particle_uuid: input.identity.issuer,
       owner_evm_address: input.identity.evmAddress,
       owner_solana_address: input.identity.solanaAddress,
+      owner_email: normalizedEmail(input.identity.email),
       handle: input.handle,
       display_name: input.name,
       bio: input.bio,

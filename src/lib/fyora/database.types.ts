@@ -113,6 +113,7 @@ export type Database = {
           gradient: Json;
           handle: string;
           id: string;
+          owner_email: string | null;
           owner_evm_address: string;
           owner_magic_issuer: string | null;
           owner_particle_uuid: string;
@@ -130,6 +131,7 @@ export type Database = {
           gradient?: Json;
           handle: string;
           id?: string;
+          owner_email?: string | null;
           owner_evm_address: string;
           owner_magic_issuer?: string | null;
           owner_particle_uuid: string;
@@ -147,6 +149,7 @@ export type Database = {
           gradient?: Json;
           handle?: string;
           id?: string;
+          owner_email?: string | null;
           owner_evm_address?: string;
           owner_magic_issuer?: string | null;
           owner_particle_uuid?: string;
