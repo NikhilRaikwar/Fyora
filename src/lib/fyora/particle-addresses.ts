@@ -37,7 +37,7 @@ export async function createUniversalAccount(ownerAddress: string) {
       version: UNIVERSAL_ACCOUNT_VERSION,
       ownerAddress: normalizedOwner,
     },
-    tradeConfig: { slippageBps: 100 },
+    tradeConfig: { slippageBps: 100, universalGas: true },
   });
 }
 
