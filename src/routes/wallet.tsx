@@ -11,7 +11,6 @@ import {
   RefreshCw,
   Send,
   ShieldCheck,
-  WalletCards,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
@@ -102,7 +101,7 @@ function shortAddress(value: string) {
 }
 
 function WalletCenter() {
-  const { identity, loading, openWallet } = useFyoraAuth();
+  const { identity, loading } = useFyoraAuth();
   const { sendPaymentQuote } = useParticleSender();
   const navigate = useNavigate();
 
@@ -180,14 +179,6 @@ function WalletCenter() {
     if (stage !== "idle") setStage("idle");
     setQuote(null);
     setTransactionId("");
-  };
-
-  const handleOpenWallet = async () => {
-    try {
-      await openWallet();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Particle Wallet could not open.");
-    }
   };
 
   const validateTransfer = () => {
@@ -323,14 +314,6 @@ function WalletCenter() {
               and Particle routing every transfer.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={handleOpenWallet}
-            className="inline-flex items-center gap-2 rounded-full bg-card chunky shadow-sticker-sm px-4 py-2 text-sm font-semibold press"
-          >
-            <ShieldCheck className="h-4 w-4" />
-            Open Particle Wallet
-          </button>
         </div>
 
         <section className="mt-8 grid gap-4 lg:grid-cols-[1.4fr_1fr]">
