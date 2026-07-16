@@ -1,6 +1,7 @@
 import { useCallback, useRef } from "react";
-import { useEthereum } from "@particle-network/authkit";
-import type { ITransaction, UniversalAccount } from "@particle-network/universal-account-sdk";
+import { useFyoraAuth } from "./AuthProvider";
+import { submitUniversalTransactionFn } from "./server-functions";
+import type { UniversalAuthorization, UniversalTransaction } from "./particle-types";
 
 function sameAddress(left?: string, right?: string) {
   return Boolean(left && right && left.toLowerCase() === right.toLowerCase());
@@ -26,20 +27,15 @@ function particleError(error: unknown, context: Record<string, unknown>) {
   return error instanceof Error ? error : new Error(message);
 }
 
-function hasUnsupportedAuthorization(transaction: ITransaction) {
-  return transaction.userOps.some(
-    (operation) => operation.eip7702Auth && !operation.eip7702Delegated,
-  );
-}
-
 export function useParticleSender() {
-  const { address, signMessage } = useEthereum();
+  const { identity, signRootHash, signEip7702Authorization, ensureEip7702Delegated } =
+    useFyoraAuth();
   const sendInFlight = useRef(false);
 
   const sendPaymentQuote = useCallback(
-    async (account: UniversalAccount, transaction: ITransaction) => {
-      if (!address) {
-        throw new Error("Particle Auth wallet is not ready yet.");
+    async (transaction: UniversalTransaction, didToken: string) => {
+      if (!identity?.evmAddress) {
+        throw new Error("Magic wallet is not ready yet.");
       }
       if (sendInFlight.current) {
         throw new Error("This transfer is already waiting for confirmation.");
@@ -47,23 +43,47 @@ export function useParticleSender() {
 
       sendInFlight.current = true;
       try {
-        const signerAddress = address.toLowerCase();
+        const signerAddress = identity.evmAddress.toLowerCase();
         const ownerAddress =
           transaction.smartAccountOptions?.ownerAddress?.toLowerCase() ?? signerAddress;
         if (!sameAddress(signerAddress, ownerAddress)) {
           throw new Error(
-            `Particle Auth is signed in as ${signerAddress}, but this quote belongs to ${ownerAddress}. Refresh and rebuild the quote.`,
+            `Magic is signed in as ${signerAddress}, but this quote belongs to ${ownerAddress}. Refresh and rebuild the quote.`,
           );
         }
 
-        if (hasUnsupportedAuthorization(transaction)) {
-          throw new Error(
-            "Particle returned an EIP-7702 authorization step that this browser signer cannot complete yet. Refresh the quote, then try again after the Particle wallet is fully initialized.",
-          );
+        await ensureEip7702Delegated(ownerAddress);
+
+        const authorizations: UniversalAuthorization[] = [];
+        const authorizationCache = new Map<string, string>();
+        for (const operation of transaction.userOps) {
+          if (!operation.eip7702Auth || operation.eip7702Delegated) continue;
+          const cacheKey = `${operation.eip7702Auth.chainId}:${operation.eip7702Auth.nonce}:${operation.eip7702Auth.address.toLowerCase()}`;
+          let signature = authorizationCache.get(cacheKey);
+          if (!signature) {
+            const authorization = await signEip7702Authorization({
+              address: operation.eip7702Auth.address,
+              chainId: operation.eip7702Auth.chainId || operation.chainId,
+              nonce: operation.eip7702Auth.nonce,
+            });
+            const { Signature } = await import("ethers");
+            signature =
+              authorization.signature ??
+              Signature.from({
+                r: authorization.r,
+                s: authorization.s,
+                v: authorization.v,
+              }).serialized;
+            authorizationCache.set(cacheKey, signature);
+          }
+          authorizations.push({
+            userOpHash: operation.userOpHash,
+            signature,
+          });
         }
 
         const { getBytes, verifyMessage } = await import("ethers");
-        const rootSignature = await signMessage(transaction.rootHash);
+        const rootSignature = await signRootHash(transaction.rootHash);
         const recoveredRootAddress = verifyMessage(
           getBytes(transaction.rootHash),
           rootSignature,
@@ -75,15 +95,16 @@ export function useParticleSender() {
         }
 
         try {
-          return (await account.sendTransaction(transaction, rootSignature)) as {
-            transactionId: string;
-          };
+          return await submitUniversalTransactionFn({
+            data: { didToken, transaction, signature: rootSignature, authorizations },
+          });
         } catch (error) {
           throw particleError(error, {
-            signerProvider: "particle-auth",
+            signerProvider: "magic",
             ownerAddress,
             signerAddress,
             recoveredRootAddress,
+            authorizations: authorizations.length,
             userOps: transaction.userOps.map((operation) => ({
               chainId: operation.chainId,
               userOpHash: operation.userOpHash,
@@ -96,12 +117,12 @@ export function useParticleSender() {
         sendInFlight.current = false;
       }
     },
-    [address, signMessage],
+    [ensureEip7702Delegated, identity?.evmAddress, signEip7702Authorization, signRootHash],
   );
 
   return {
-    embeddedWallet: address ? { address } : null,
-    signerLabel: "Particle Auth wallet",
+    embeddedWallet: identity?.evmAddress ? { address: identity.evmAddress } : null,
+    signerLabel: "Magic embedded wallet",
     sendPaymentQuote,
   };
 }

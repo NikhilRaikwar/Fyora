@@ -1,6 +1,6 @@
 import { Buffer } from "buffer";
 
-type BrowserGlobal = typeof globalThis & {
+type BrowserGlobal = Omit<typeof globalThis, "process" | "Buffer"> & {
   process?: BrowserProcess;
   Buffer?: typeof Buffer;
 };
@@ -15,7 +15,7 @@ type BrowserProcess = {
 };
 
 export function installBrowserPolyfills() {
-  const scope = globalThis as BrowserGlobal;
+  const scope = globalThis as unknown as BrowserGlobal;
   scope.Buffer ??= Buffer;
   scope.process ??= {
     browser: true,

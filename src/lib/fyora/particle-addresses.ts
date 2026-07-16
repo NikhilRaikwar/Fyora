@@ -1,5 +1,3 @@
-import type { ISmartAccountOptions } from "@particle-network/universal-account-sdk";
-
 export type UniversalAddressMode = "separateSmartAccount" | "eip7702OwnerAddress";
 
 export type ResolvedUniversalAddresses = {
@@ -16,15 +14,15 @@ function env(name: string) {
   return value;
 }
 
+function evmAddress(value: string) {
+  const normalized = value.trim().toLowerCase();
+  if (!/^0x[a-f0-9]{40}$/.test(normalized)) {
+    throw new Error("Magic did not return a valid EVM owner address yet.");
+  }
+  return normalized;
+}
+
 export async function createUniversalAccount(ownerAddress: string) {
-  const normalizedOwner = ownerAddress.trim().toLowerCase();
-  if (!/^0x[a-f0-9]{40}$/.test(normalizedOwner)) {
-    throw new Error("Particle Auth did not return a valid EVM owner address yet.");
-  }
-  if (typeof window !== "undefined") {
-    const { installBrowserPolyfills } = await import("./browser-polyfills");
-    installBrowserPolyfills();
-  }
   const { UniversalAccount, UNIVERSAL_ACCOUNT_VERSION } =
     await import("@particle-network/universal-account-sdk");
   return new UniversalAccount({
@@ -35,7 +33,7 @@ export async function createUniversalAccount(ownerAddress: string) {
       useEIP7702: true,
       name: "UNIVERSAL",
       version: UNIVERSAL_ACCOUNT_VERSION,
-      ownerAddress: normalizedOwner,
+      ownerAddress: evmAddress(ownerAddress),
     },
     tradeConfig: { slippageBps: 100, universalGas: true },
   });
@@ -44,34 +42,36 @@ export async function createUniversalAccount(ownerAddress: string) {
 export async function resolveUniversalAddresses(
   ownerAddress: string,
 ): Promise<ResolvedUniversalAddresses> {
-  const fallbackOwner = ownerAddress.trim().toLowerCase();
-  if (!/^0x[a-f0-9]{40}$/.test(fallbackOwner)) {
-    throw new Error("Particle Auth did not return a valid EVM owner address yet.");
-  }
+  const fallbackOwner = evmAddress(ownerAddress);
   try {
-    const options = (await (
-      await createUniversalAccount(fallbackOwner)
-    ).getSmartAccountOptions()) as ISmartAccountOptions;
-    const owner = (options.ownerAddress || fallbackOwner).trim().toLowerCase();
-    const smartAccount = options.smartAccountAddress?.trim().toLowerCase();
+    const options = await (await createUniversalAccount(fallbackOwner)).getSmartAccountOptions();
+    const smartAccountAddress = String(options.smartAccountAddress ?? "")
+      .trim()
+      .toLowerCase();
     return {
-      ownerAddress: owner,
-      evmUaAddress: smartAccount || owner,
-      solanaUaAddress: options.solanaSmartAccountAddress?.trim() || null,
-      mode: smartAccount ? "separateSmartAccount" : "eip7702OwnerAddress",
+      ownerAddress: fallbackOwner,
+      evmUaAddress: /^0x[a-f0-9]{40}$/.test(smartAccountAddress)
+        ? smartAccountAddress
+        : fallbackOwner,
+      solanaUaAddress: options.solanaSmartAccountAddress ?? null,
+      mode: /^0x[a-f0-9]{40}$/.test(smartAccountAddress)
+        ? "separateSmartAccount"
+        : "eip7702OwnerAddress",
+      lookupWarning: /^0x[a-f0-9]{40}$/.test(smartAccountAddress)
+        ? undefined
+        : "Using the Magic EIP-7702 owner address as the Universal receive address.",
     };
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Unknown Particle address error";
     console.warn("[Fyora] Falling back to EIP-7702 owner address for Universal receive", {
       ownerAddress: fallbackOwner,
-      message,
+      message: error instanceof Error ? error.message : String(error),
     });
-    return {
-      ownerAddress: fallbackOwner,
-      evmUaAddress: fallbackOwner,
-      solanaUaAddress: null,
-      mode: "eip7702OwnerAddress",
-      lookupWarning: message,
-    };
   }
+  return {
+    ownerAddress: fallbackOwner,
+    evmUaAddress: fallbackOwner,
+    solanaUaAddress: null,
+    mode: "eip7702OwnerAddress",
+    lookupWarning: "Using the Magic EIP-7702 owner address as the Universal receive address.",
+  };
 }

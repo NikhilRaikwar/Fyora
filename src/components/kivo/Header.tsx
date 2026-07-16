@@ -94,7 +94,7 @@ export function Header() {
                     className="font-semibold text-sm truncate"
                     style={{ fontFamily: "var(--font-mono)" }}
                   >
-                    {current ? `@${current.handle}` : (identity.email ?? "Particle account")}
+                    {current ? `@${current.handle}` : (identity.email ?? "Magic account")}
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />

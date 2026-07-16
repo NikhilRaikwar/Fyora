@@ -1,19 +1,30 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
-import { AuthType, type UserInfo } from "@particle-network/auth-core";
-import {
-  AuthCoreContextProvider,
-  useAuthCore,
-  useConnect,
-  useEthereum,
-} from "@particle-network/authkit";
-import { arbitrum, base, bsc, mainnet, solana } from "@particle-network/authkit/chains";
+import { EVMExtension } from "@magic-ext/evm";
+import { Magic as MagicBase, type MagicUserMetadata } from "magic-sdk";
+import { BrowserProvider, getBytes } from "ethers";
 import { AuthContext, type AuthContextValue } from "./AuthProvider";
+import { createUniversalAccount } from "./particle-addresses";
 import type { FyoraIdentity } from "./types";
 
-type ParticleWalletInfo = {
-  chain_name?: string;
-  public_address?: string;
+type MagicClient = MagicBase<[EVMExtension]> & {
+  wallet: {
+    showUI?: () => Promise<void>;
+    sign7702Authorization: (authorization: {
+      contractAddress: string;
+      chainId: number;
+      nonce?: number;
+    }) => Promise<{ r: string; s: string; v: number; signature?: string }>;
+    send7702Transaction: (transaction: {
+      to: string;
+      data?: string;
+      value?: string;
+      authorizationList: Array<{ r: string; s: string; v: number; signature?: string }>;
+    }) => Promise<unknown>;
+  };
 };
+
+const BASE_CHAIN_ID = 8453;
+let magicClient: MagicClient | null = null;
 
 function env(name: string) {
   const value = (import.meta.env[name] as string | undefined)?.trim();
@@ -21,80 +32,87 @@ function env(name: string) {
   return value;
 }
 
-function emailFor(userInfo: UserInfo) {
-  return (
-    userInfo.email ??
-    userInfo.google_email ??
-    userInfo.apple_email ??
-    userInfo.github_email ??
-    userInfo.discord_email ??
-    null
-  );
+function optionalEnv(name: string, fallback: string) {
+  return (import.meta.env[name] as string | undefined)?.trim() || fallback;
 }
 
-function solanaAddressFor(userInfo: UserInfo) {
-  return walletAddressFor(userInfo, "solana");
+function getMagicClient() {
+  if (!magicClient) {
+    magicClient = new MagicBase(env("VITE_MAGIC_PUBLISHABLE_KEY"), {
+      extensions: [
+        new EVMExtension([
+          {
+            rpcUrl: optionalEnv("VITE_BASE_RPC_URL", "https://mainnet.base.org"),
+            chainId: BASE_CHAIN_ID,
+            default: true,
+          },
+        ]),
+      ],
+    }) as MagicClient;
+  }
+  return magicClient;
 }
 
-function walletAddressFor(userInfo: UserInfo, chainName: "evm_chain" | "solana") {
-  const wallets = (userInfo.wallets ?? []) as ParticleWalletInfo[];
-  return (
-    wallets
-      .find((wallet) => wallet.chain_name === chainName)
-      ?.public_address?.trim()
-      .toLowerCase() ?? null
-  );
+function metadataAddress(metadata: MagicUserMetadata) {
+  return metadata.wallets?.ethereum?.publicAddress?.trim().toLowerCase() ?? null;
 }
 
-function encodeParticleSession(userInfo: UserInfo) {
-  return JSON.stringify({
-    provider: "particle",
-    uuid: userInfo.uuid,
-    token: userInfo.token,
-  });
+function metadataEmail(metadata: MagicUserMetadata) {
+  return metadata.email?.trim().toLowerCase() ?? null;
+}
+
+function metadataSolanaAddress(metadata: MagicUserMetadata) {
+  return metadata.wallets?.solana?.publicAddress?.trim() ?? null;
+}
+
+async function signerAddress(magic: MagicClient) {
+  const provider = new BrowserProvider(magic.rpcProvider);
+  const signer = await provider.getSigner();
+  return (await signer.getAddress()).toLowerCase();
 }
 
 function missingIdentityError() {
-  return new Error("Particle Auth wallet is still getting ready. Try again in a moment.");
+  return new Error("Magic wallet is still getting ready. Try again in a moment.");
 }
 
 function FyoraAuthProviderInner({ children }: { children: ReactNode }) {
-  const { connect, disconnect, connected, connectionStatus } = useConnect();
-  const { userInfo, openWallet: openParticleWallet } = useAuthCore();
-  const { address, enable } = useEthereum();
+  const [magic] = useState(() => getMagicClient());
   const [identity, setIdentity] = useState<FyoraIdentity | null>(null);
+  const [loading, setLoading] = useState(true);
 
   const buildIdentity = useCallback(async (): Promise<FyoraIdentity> => {
-    if (!connected || !userInfo) throw missingIdentityError();
-    const evmAddress = address || walletAddressFor(userInfo, "evm_chain") || (await enable());
+    const loggedIn = await magic.user.isLoggedIn();
+    if (!loggedIn) throw missingIdentityError();
+    const metadata = await magic.user.getInfo();
+    const didToken = await magic.user.getIdToken({ lifespan: 60 * 60 * 24 * 7 });
+    const evmAddress = metadataAddress(metadata) ?? (await signerAddress(magic));
     if (!evmAddress) throw missingIdentityError();
     return {
-      didToken: encodeParticleSession(userInfo),
-      issuer: `particle:${userInfo.uuid}`,
-      email: emailFor(userInfo),
-      evmAddress: evmAddress.toLowerCase(),
-      solanaAddress: solanaAddressFor(userInfo),
+      didToken,
+      issuer: metadata.issuer ?? `magic:${evmAddress}`,
+      email: metadataEmail(metadata),
+      evmAddress,
+      solanaAddress: metadataSolanaAddress(metadata),
     };
-  }, [address, connected, enable, userInfo]);
+  }, [magic]);
 
   useEffect(() => {
     let active = true;
-    if (!connected || !userInfo) {
-      setIdentity(null);
-      return;
-    }
+    setLoading(true);
     buildIdentity()
       .then((next) => {
         if (active) setIdentity(next);
       })
-      .catch((error) => {
-        console.error("Particle identity refresh failed:", error);
+      .catch(() => {
         if (active) setIdentity(null);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
       });
     return () => {
       active = false;
     };
-  }, [buildIdentity, connected, userInfo]);
+  }, [buildIdentity]);
 
   const refreshIdentity = useCallback(async () => {
     const next = await buildIdentity();
@@ -104,92 +122,107 @@ function FyoraAuthProviderInner({ children }: { children: ReactNode }) {
 
   const signInWithEmail = useCallback(
     async (email: string) => {
-      await connect(email ? { email } : undefined);
+      setLoading(true);
+      try {
+        await magic.auth.loginWithEmailOTP({ email, showUI: true });
+        await refreshIdentity();
+      } finally {
+        setLoading(false);
+      }
     },
-    [connect],
+    [magic, refreshIdentity],
   );
 
   const signOut = useCallback(async () => {
-    await disconnect();
+    await magic.user.logout();
     setIdentity(null);
-  }, [disconnect]);
+  }, [magic]);
 
   const openWallet = useCallback(async () => {
-    try {
-      await openParticleWallet({ windowSize: "small", topMenuType: "close" });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Particle Wallet could not open.";
-      if (message.toLowerCase().includes("wallet entry is not activated")) {
-        throw new Error(
-          "Particle Wallet is not activated for this project. Enable Wallet/Wallet Entry in the Particle Dashboard, then redeploy or refresh.",
-        );
-      }
-      throw error;
+    if (!magic.wallet.showUI) {
+      throw new Error("Magic Wallet UI is not enabled for this app.");
     }
-  }, [openParticleWallet]);
+    await magic.wallet.showUI();
+  }, [magic]);
+
+  const signRootHash = useCallback(
+    async (rootHash: string) => {
+      const provider = new BrowserProvider(magic.rpcProvider);
+      const signer = await provider.getSigner();
+      return signer.signMessage(getBytes(rootHash));
+    },
+    [magic],
+  );
+
+  const signEip7702Authorization = useCallback(
+    async (authorization: { address: string; chainId: number; nonce: number }) =>
+      magic.wallet.sign7702Authorization({
+        contractAddress: authorization.address,
+        chainId: authorization.chainId,
+        nonce: authorization.nonce,
+      }),
+    [magic],
+  );
+
+  const ensureEip7702Delegated = useCallback(
+    async (ownerAddress: string) => {
+      const normalizedOwner = ownerAddress.toLowerCase();
+      const universalAccount = await createUniversalAccount(normalizedOwner);
+      const deployments = (await universalAccount.getEIP7702Deployments()) as Array<{
+        chainId?: number;
+        isDelegated?: boolean;
+      }>;
+      const baseDeployment = deployments.find(
+        (deployment: { chainId?: number; isDelegated?: boolean }) =>
+          deployment.chainId === BASE_CHAIN_ID,
+      );
+      if (baseDeployment?.isDelegated) return;
+
+      await magic.evm.switchChain(BASE_CHAIN_ID);
+      const [auth] = await universalAccount.getEIP7702Auth([BASE_CHAIN_ID]);
+      if (!auth?.address) throw new Error("Particle did not return a Base EIP-7702 auth.");
+      const authorization = await magic.wallet.sign7702Authorization({
+        contractAddress: auth.address,
+        chainId: BASE_CHAIN_ID,
+        nonce: Number(auth.nonce) + 1,
+      });
+      await magic.wallet.send7702Transaction({
+        to: normalizedOwner,
+        data: "0x",
+        authorizationList: [authorization],
+      });
+    },
+    [magic],
+  );
 
   const value = useMemo<AuthContextValue>(
     () => ({
       identity,
-      loading:
-        connectionStatus === "loading" ||
-        connectionStatus === "connecting" ||
-        (connected && !identity),
+      loading,
       signInWithEmail,
       refreshIdentity,
       signOut,
       openWallet,
+      signRootHash,
+      signEip7702Authorization,
+      ensureEip7702Delegated,
     }),
-    [connected, connectionStatus, identity, openWallet, refreshIdentity, signInWithEmail, signOut],
+    [
+      ensureEip7702Delegated,
+      identity,
+      loading,
+      openWallet,
+      refreshIdentity,
+      signEip7702Authorization,
+      signInWithEmail,
+      signOut,
+      signRootHash,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
-export default function ParticleAuthProvider({ children }: { children: ReactNode }) {
-  return (
-    <AuthCoreContextProvider
-      options={{
-        projectId: env("VITE_PARTICLE_PROJECT_ID"),
-        clientKey: env("VITE_PARTICLE_CLIENT_KEY"),
-        appId: env("VITE_PARTICLE_APP_ID"),
-        chains: [base, arbitrum, mainnet, bsc, solana],
-        authTypes: [AuthType.email],
-        themeType: "light",
-        fiatCoin: "USD",
-        language: "en",
-        promptSettingConfig: {
-          promptPaymentPasswordSettingWhenSign: false,
-        },
-        customStyle: {
-          projectName: "Fyora",
-          subtitle: "One login. One Universal Balance.",
-          logo: "https://www.fyora.app/fyora-favicon.png",
-          primaryBtnBorderRadius: 999,
-          modalBorderRadius: 24,
-          cardBorderRadius: 18,
-          theme: {
-            light: {
-              accentColor: "#C6F24E",
-              primaryBtnBackgroundColor: "#C6F24E",
-              primaryBtnColor: "#141313",
-              themeBackgroundColor: "#FBF7EE",
-              modalBackgroundColor: "#FBF7EE",
-              textColor: "#141313",
-              secondaryTextColor: "#625F58",
-              cardBorderColor: "#141313",
-              inputBorderColor: "#141313",
-              inputBackgroundColor: "#FFFDF7",
-            },
-          },
-        },
-        wallet: {
-          visible: false,
-          themeType: "light",
-        },
-      }}
-    >
-      <FyoraAuthProviderInner>{children}</FyoraAuthProviderInner>
-    </AuthCoreContextProvider>
-  );
+export default function MagicAuthProvider({ children }: { children: ReactNode }) {
+  return <FyoraAuthProviderInner>{children}</FyoraAuthProviderInner>;
 }

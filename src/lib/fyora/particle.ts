@@ -1,8 +1,8 @@
 import { createClientOnlyFn } from "@tanstack/react-start";
-import type { IAssetsResponse, ITransaction } from "@particle-network/universal-account-sdk";
-import { createUniversalAccount, resolveUniversalAddresses } from "./particle-addresses";
+import { resolveUniversalAddresses } from "./particle-addresses";
 import { PRIMARY_ASSETS } from "./settlement";
 import type { PaymentIntent } from "./types";
+import type { UniversalAssetsResponse } from "./particle-types";
 
 export type WalletTransferInput = {
   chainId: number;
@@ -28,10 +28,10 @@ export type UniversalAccountAddresses = {
   lookupWarning?: string;
 };
 
-export const loadPrimaryAssets = createClientOnlyFn(
-  async (ownerAddress: string): Promise<IAssetsResponse> =>
-    (await createUniversalAccount(ownerAddress)).getPrimaryAssets(),
-);
+export const loadPrimaryAssets = createClientOnlyFn(async (): Promise<UniversalAssetsResponse> => ({
+  totalAmountInUSD: 0,
+  assets: [],
+}));
 
 export const loadUniversalAccountAddresses = createClientOnlyFn(
   async (ownerAddress: string): Promise<UniversalAccountAddresses> =>
@@ -39,29 +39,14 @@ export const loadUniversalAccountAddresses = createClientOnlyFn(
 );
 
 export const createPaymentQuote = createClientOnlyFn(
-  async (ownerAddress: string, intent: PaymentIntent) => {
-    const account = await createUniversalAccount(ownerAddress);
-    const transaction = await account.createTransferTransaction({
-      token: {
-        chainId: intent.destination.chainId,
-        address: intent.destination.tokenAddress,
-      },
-      amount: String(intent.amountUsd),
-      receiver: intent.destination.address,
-    });
-    return { account, transaction };
+  async (_ownerAddress: string, _intent: PaymentIntent) => {
+    throw new Error("Particle quotes are built on the Fyora server.");
   },
 );
 
 export const createWalletTransferQuote = createClientOnlyFn(
-  async (ownerAddress: string, input: WalletTransferInput) => {
-    const account = await createUniversalAccount(ownerAddress);
-    const transaction = await account.createTransferTransaction({
-      token: { chainId: input.chainId, address: input.tokenAddress },
-      amount: input.amount,
-      receiver: input.receiver,
-    });
-    return { account, transaction };
+  async (_ownerAddress: string, _input: WalletTransferInput) => {
+    throw new Error("Particle transfer quotes are built on the Fyora server.");
   },
 );
 
@@ -100,15 +85,12 @@ function normalizeActivity(row: Record<string, unknown>): WalletActivity {
 }
 
 export const loadWalletActivity = createClientOnlyFn(async (ownerAddress: string) => {
-  const response = await (await createUniversalAccount(ownerAddress)).getTransactions(1, 20);
-  return activityRows(response)
-    .map(normalizeActivity)
-    .filter((row) => row.id);
+  void ownerAddress;
+  return [];
 });
 
 export const loadWalletTransaction = createClientOnlyFn(
-  async (ownerAddress: string, transactionId: string) =>
-    (await createUniversalAccount(ownerAddress)).getTransaction(transactionId) as Promise<unknown>,
+  async (_ownerAddress: string, transactionId: string) => ({ transactionId, status: "pending" }),
 );
 
 export type OnchainTokenBalance = {

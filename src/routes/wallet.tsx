@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import type { IAssetsResponse, ITransaction } from "@particle-network/universal-account-sdk";
+import type { UniversalTransaction } from "@/lib/fyora/particle-types";
 import { isAddress } from "ethers";
 import {
   ArrowRight,
@@ -20,14 +20,13 @@ import { CopyButton } from "@/components/kivo/CopyButton";
 import { AuthLoginCard } from "@/components/kivo/AuthLoginCard";
 import { useFyoraAuth } from "@/lib/fyora/AuthProvider";
 import {
-  createWalletTransferQuote,
   loadEvmOnchainBalances,
   loadUniversalAccountAddresses,
-  loadPrimaryAssets,
   loadWalletActivity,
   loadWalletTransaction,
   type WalletActivity,
 } from "@/lib/fyora/particle";
+import { createWalletTransferQuoteFn, loadPrimaryAssetsFn } from "@/lib/fyora/server-functions";
 import { useParticleSender } from "@/lib/fyora/useParticleSender";
 import { PRIMARY_ASSETS } from "@/lib/fyora/settlement";
 import type { FyoraIdentity } from "@/lib/fyora/types";
@@ -132,18 +131,19 @@ function WalletCenter() {
 
 function AuthenticatedWalletCenter({ identity }: { identity: FyoraIdentity }) {
   const { sendPaymentQuote } = useParticleSender();
+  const { ensureEip7702Delegated } = useFyoraAuth();
   const [receiveNetwork, setReceiveNetwork] = useState<"evm" | "solana">("evm");
   const [tokenId, setTokenId] = useState<(typeof TOKEN_IDS)[number]>("usdc");
   const [chainId, setChainId] = useState(8453);
   const [amount, setAmount] = useState("");
   const [receiver, setReceiver] = useState("");
   const [stage, setStage] = useState<TransferStage>("idle");
-  const [quote, setQuote] = useState<{ account?: unknown; transaction: ITransaction } | null>(null);
+  const [quote, setQuote] = useState<UniversalTransaction | null>(null);
   const [transactionId, setTransactionId] = useState("");
 
   const assetsQuery = useQuery({
     queryKey: ["particle-primary-assets", identity?.evmAddress],
-    queryFn: () => loadPrimaryAssets(identity!.evmAddress),
+    queryFn: () => loadPrimaryAssetsFn({ data: { didToken: identity!.didToken } }),
     enabled: Boolean(identity?.evmAddress),
     retry: 1,
   });
@@ -264,11 +264,15 @@ function AuthenticatedWalletCenter({ identity }: { identity: FyoraIdentity }) {
     try {
       validateTransfer();
       setStage("quoting");
-      const next = await createWalletTransferQuote(identity.evmAddress, {
-        chainId: selectedAsset.chainId,
-        tokenAddress: selectedAsset.tokenAddress,
-        amount,
-        receiver: receiver.trim(),
+      await ensureEip7702Delegated(identity.evmAddress);
+      const next = await createWalletTransferQuoteFn({
+        data: {
+          didToken: identity.didToken,
+          chainId: selectedAsset.chainId,
+          tokenAddress: selectedAsset.tokenAddress,
+          amount,
+          receiver: receiver.trim(),
+        },
       });
       setQuote(next);
       setStage("quoted");
@@ -297,17 +301,18 @@ function AuthenticatedWalletCenter({ identity }: { identity: FyoraIdentity }) {
     if (!quote || !identity) return;
     try {
       setStage("signing");
-      const freshQuote = await createWalletTransferQuote(identity.evmAddress, {
-        chainId: selectedAsset.chainId,
-        tokenAddress: selectedAsset.tokenAddress,
-        amount,
-        receiver: receiver.trim(),
+      await ensureEip7702Delegated(identity.evmAddress);
+      const freshQuote = await createWalletTransferQuoteFn({
+        data: {
+          didToken: identity.didToken,
+          chainId: selectedAsset.chainId,
+          tokenAddress: selectedAsset.tokenAddress,
+          amount,
+          receiver: receiver.trim(),
+        },
       });
       setQuote(freshQuote);
-      const result = await sendPaymentQuote(
-        freshQuote.account as Parameters<typeof sendPaymentQuote>[0],
-        freshQuote.transaction,
-      );
+      const result = await sendPaymentQuote(freshQuote, identity.didToken);
       setStage("submitting");
       setTransactionId(result.transactionId);
       setStage("pending");
@@ -332,17 +337,17 @@ function AuthenticatedWalletCenter({ identity }: { identity: FyoraIdentity }) {
     receiveNetwork === "solana"
       ? "Solana Universal address"
       : receiveAddress.toLowerCase() === ownerAddress.toLowerCase()
-        ? "Particle EOA upgraded as Universal Account"
+        ? "Magic EOA upgraded as Universal Account"
         : "Separate Particle UA address";
   const receiveNetworks = activeAddresses?.solanaUaAddress
     ? (["evm", "solana"] as const)
     : (["evm"] as const);
   const feeUsd = quote
-    ? Number(quote.transaction.tokenChanges.totalFeeInUSD || 0) +
-      Number(quote.transaction.transactionFees.transactionLPFeeAmountInUSD || 0) +
-      Number(quote.transaction.transactionFees.transactionServiceFeeAmountInUSD || 0)
+    ? Number(quote.tokenChanges.totalFeeInUSD || 0) +
+      Number(quote.transactionFees.transactionLPFeeAmountInUSD || 0) +
+      Number(quote.transactionFees.transactionServiceFeeAmountInUSD || 0)
     : 0;
-  const receivedUsd = quote ? Number(quote.transaction.tokenChanges.totalIncrAmountInUSD || 0) : 0;
+  const receivedUsd = quote ? Number(quote.tokenChanges.totalIncrAmountInUSD || 0) : 0;
   const universalXUrl = transactionId
     ? `https://universalx.app/activity/details?id=${encodeURIComponent(transactionId)}`
     : "";
@@ -358,7 +363,7 @@ function AuthenticatedWalletCenter({ identity }: { identity: FyoraIdentity }) {
             </div>
             <h1 className="mt-3 font-display text-4xl italic sm:text-6xl">Wallet center</h1>
             <p className="mt-2 max-w-xl text-sm text-muted-foreground sm:text-base">
-              One Universal Balance across supported chains, with Particle securing the embedded EOA
+              One Universal Balance across supported chains, with Magic securing the embedded EOA
               and Particle routing every transfer.
             </p>
           </div>
@@ -406,7 +411,7 @@ function AuthenticatedWalletCenter({ identity }: { identity: FyoraIdentity }) {
               <h2 className="font-display text-2xl italic">Receive</h2>
             </div>
             <p className="mt-1 text-xs text-muted-foreground">
-              Funds arrive here. Particle signs sends because it owns this Universal Account.
+              Funds arrive here. Magic signs sends because it owns this Universal Account.
             </p>
             <div className="mt-4 inline-flex rounded-full bg-secondary p-1 chunky">
               {receiveNetworks.map((network) => (
@@ -468,7 +473,7 @@ function AuthenticatedWalletCenter({ identity }: { identity: FyoraIdentity }) {
                   <div className="mt-1 text-[11px] text-muted-foreground">
                     QR opens a wallet deposit URI. Copy address for exchanges or manual sends.
                   </div>
-                  {activeAddresses.lookupWarning && (
+                  {activeAddresses?.lookupWarning && (
                     <div className="mt-1 text-[11px] text-muted-foreground">
                       Using the EIP-7702 owner address while Particle finishes UA address lookup.
                     </div>
@@ -547,7 +552,7 @@ function AuthenticatedWalletCenter({ identity }: { identity: FyoraIdentity }) {
               <h2 className="font-display text-3xl italic">Send anywhere</h2>
             </div>
             <p className="mt-1 text-sm text-muted-foreground">
-              This sends from your Universal Balance, confirmed by Particle.
+              This sends from your Universal Balance, confirmed by Magic and routed by Particle.
             </p>
             <p className="mt-2 text-xs text-muted-foreground">
               Keep extra balance for Particle routing fees. For a demo, fund about $0.20 on Base
@@ -645,11 +650,7 @@ function AuthenticatedWalletCenter({ identity }: { identity: FyoraIdentity }) {
                   <QuoteStat label="Estimated fees" value={money(feeUsd)} />
                   <QuoteStat
                     label="Expected delivery"
-                    value={
-                      quote.transaction.userOps.length > 1
-                        ? "Cross-chain route"
-                        : "Single-chain route"
-                    }
+                    value={quote.userOps.length > 1 ? "Cross-chain route" : "Single-chain route"}
                   />
                 </div>
                 <button
@@ -664,7 +665,7 @@ function AuthenticatedWalletCenter({ identity }: { identity: FyoraIdentity }) {
                     <ShieldCheck className="h-4 w-4" />
                   )}
                   {stage === "signing"
-                    ? "Confirm with Particle"
+                    ? "Confirm with Magic"
                     : stage === "submitting"
                       ? "Submitting"
                       : stage === "pending"

@@ -7,7 +7,9 @@ import { chainById, tokenById } from "@/lib/fyora/chains";
 import type { Creator } from "@/lib/fyora/types";
 import { useFyoraAuth } from "@/lib/fyora/AuthProvider";
 import {
+  createPaymentQuoteFn,
   createPaymentIntentFn,
+  loadPrimaryAssetsFn,
   recordPaymentSubmissionFn,
   refreshPaymentFn,
 } from "@/lib/fyora/server-functions";
@@ -16,11 +18,13 @@ import { ChainBadge, TokenBadge } from "./Badges";
 import { Sticker } from "./Sticker";
 import { ArrowRight, Check, ExternalLink, Loader2, Mail, Sparkles } from "lucide-react";
 import { toast } from "sonner";
-import { createPaymentQuote, loadPrimaryAssets } from "@/lib/fyora/particle";
+import { installBrowserPolyfills } from "@/lib/fyora/browser-polyfills";
 import { useParticleSender } from "@/lib/fyora/useParticleSender";
 
 type Step = "confirm" | "connect" | "balance" | "signing" | "receipt";
 type BalanceItem = { chain: string; token: string; amount: number; amountInUSD: number };
+
+installBrowserPolyfills();
 
 const SUPPORTER_EMOJIS = ["🦊", "🐳", "🦁", "🐸", "🌻", "🚀", "✨", "🐧", "🌊", "🌟"];
 
@@ -48,7 +52,7 @@ export function PaymentSheet({
   const [confirmed, setConfirmed] = useState(false);
   const [supporterEmoji, setSupporterEmoji] = useState(SUPPORTER_EMOJIS[0]);
   const [idempotencyKey, setIdempotencyKey] = useState("");
-  const { identity, refreshIdentity, signInWithEmail } = useFyoraAuth();
+  const { identity, refreshIdentity, signInWithEmail, ensureEip7702Delegated } = useFyoraAuth();
   const { sendPaymentQuote } = useParticleSender();
   const router = useRouter();
 
@@ -56,7 +60,7 @@ export function PaymentSheet({
   const token = tokenById(creator.settlement.token);
   const signingSteps = useMemo(
     () => [
-      "Confirming with Particle Auth...",
+      "Confirming with Magic...",
       "Routing across chains...",
       `Bridging to ${chain.name}...`,
       `Landing ${token.symbol}...`,
@@ -84,8 +88,8 @@ export function PaymentSheet({
     return () => clearTimeout(timer);
   }, [open]);
 
-  const loadBalance = async (ownerAddress: string) => {
-    const response = await loadPrimaryAssets(ownerAddress);
+  const loadBalance = async (didToken: string) => {
+    const response = await loadPrimaryAssetsFn({ data: { didToken } });
     setUnifiedTotal(response.totalAmountInUSD);
     setBalances(
       response.assets.flatMap((asset) =>
@@ -108,7 +112,7 @@ export function PaymentSheet({
     }
     setConnecting(true);
     try {
-      await loadBalance(identity.evmAddress);
+      await loadBalance(identity.didToken);
       setStep("balance");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not load Universal Balance.");
@@ -121,9 +125,9 @@ export function PaymentSheet({
     setConnecting(true);
     try {
       await signInWithEmail(email);
-      toast.success("Complete sign-in in the Particle modal.");
+      toast.success("Complete sign-in in the Magic modal.");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Particle sign-in failed.");
+      toast.error(error instanceof Error ? error.message : "Magic sign-in failed.");
     } finally {
       setConnecting(false);
     }
@@ -133,7 +137,7 @@ export function PaymentSheet({
     if (!open || step !== "connect" || !identity || connecting) return;
     let cancelled = false;
     setConnecting(true);
-    loadBalance(identity.evmAddress)
+    loadBalance(identity.didToken)
       .then(() => {
         if (!cancelled) setStep("balance");
       })
@@ -177,6 +181,7 @@ export function PaymentSheet({
     setSignIdx(0);
     try {
       const currentIdentity = await refreshIdentity();
+      await ensureEip7702Delegated(currentIdentity.evmAddress);
       const intent = await createPaymentIntentFn({
         data: {
           didToken: currentIdentity.didToken,
@@ -188,9 +193,11 @@ export function PaymentSheet({
           idempotencyKey,
         },
       });
-      const quote = await createPaymentQuote(currentIdentity.evmAddress, intent);
+      const quote = await createPaymentQuoteFn({
+        data: { didToken: currentIdentity.didToken, intentId: intent.id },
+      });
       setSignIdx(1);
-      const submitted = await sendPaymentQuote(quote.account, quote.transaction);
+      const submitted = await sendPaymentQuote(quote, currentIdentity.didToken);
       setTxId(submitted.transactionId);
       setSignIdx(2);
       const recorded = await recordPaymentSubmissionFn({
@@ -219,6 +226,7 @@ export function PaymentSheet({
         });
       }
     } catch (error) {
+      console.error("[Fyora] Payment submission failed", error);
       toast.error(error instanceof Error ? error.message : "Payment could not be submitted.");
       setStep("balance");
     }
@@ -315,11 +323,11 @@ export function PaymentSheet({
                   >
                     {connecting ? (
                       <>
-                        <Loader2 className="w-4 h-4 animate-spin" /> Opening Particle...
+                        <Loader2 className="w-4 h-4 animate-spin" /> Opening Magic...
                       </>
                     ) : (
                       <>
-                        <Sparkles className="w-4 h-4" /> Continue with Particle
+                        <Sparkles className="w-4 h-4" /> Continue with Magic
                       </>
                     )}
                   </button>

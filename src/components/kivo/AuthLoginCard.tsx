@@ -13,7 +13,7 @@ export function AuthLoginCard({ title = "Sign in to Fyora" }: { title?: string }
     try {
       await signInWithEmail(email);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Particle sign-in failed.");
+      toast.error(error instanceof Error ? error.message : "Magic sign-in failed.");
     } finally {
       setWorking(false);
     }
@@ -24,7 +24,7 @@ export function AuthLoginCard({ title = "Sign in to Fyora" }: { title?: string }
       <div>
         <h2 className="font-display italic text-3xl">{title}</h2>
         <p className="text-sm text-muted-foreground mt-1">
-          Particle creates your embedded wallet and Universal Account.
+          Magic creates your embedded EOA. Particle upgrades it into a Universal Account.
         </p>
       </div>
       <div className="rounded-2xl chunky bg-lilac/30 p-4 flex items-center gap-2">
@@ -43,7 +43,7 @@ export function AuthLoginCard({ title = "Sign in to Fyora" }: { title?: string }
         className="w-full rounded-full bg-lime text-ink py-3 font-semibold chunky shadow-sticker press flex items-center justify-center gap-2 disabled:opacity-60"
       >
         {working ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-        Continue with Particle
+        Continue with Magic
       </button>
     </div>
   );

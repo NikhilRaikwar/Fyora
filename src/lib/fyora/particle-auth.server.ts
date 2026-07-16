@@ -1,33 +1,7 @@
+import { Magic, WalletType, type MagicUserMetadata } from "@magic-sdk/admin";
 import type { FyoraIdentity } from "./types";
 
-type ParticleSession = {
-  provider: "particle";
-  uuid: string;
-  token: string;
-};
-
-type ParticleWallet = {
-  chain_name?: string;
-  chainName?: string;
-  chain?: string;
-  public_address?: string;
-  publicAddress?: string;
-};
-
-type ParticleUserInfo = {
-  uuid?: string;
-  token?: string;
-  email?: string;
-  google_email?: string;
-  googleEmail?: string;
-  apple_email?: string;
-  appleEmail?: string;
-  github_email?: string;
-  githubEmail?: string;
-  discord_email?: string;
-  discordEmail?: string;
-  wallets?: ParticleWallet[];
-};
+let magicPromise: Promise<Awaited<ReturnType<typeof Magic.init>>> | null = null;
 
 function env(name: string) {
   const value = process.env[name]?.trim();
@@ -35,106 +9,41 @@ function env(name: string) {
   return value;
 }
 
-function parseSession(didToken: string): ParticleSession {
-  try {
-    const parsed = JSON.parse(didToken) as Partial<ParticleSession>;
-    if (parsed.provider !== "particle" || !parsed.uuid || !parsed.token) {
-      throw new Error("Invalid Particle session payload.");
-    }
-    return {
-      provider: "particle",
-      uuid: parsed.uuid,
-      token: parsed.token,
-    };
-  } catch (error) {
-    if (error instanceof Error && error.message === "Invalid Particle session payload.") {
-      throw error;
-    }
-    throw new Error("Invalid Particle session payload.");
-  }
+function getMagicAdmin() {
+  magicPromise ??= Magic.init(env("MAGIC_SECRET_KEY"));
+  return magicPromise;
 }
 
-function authHeader() {
-  const projectId = env("VITE_PARTICLE_PROJECT_ID");
-  const serverKey = env("PARTICLE_SERVER_KEY");
-  return `Basic ${Buffer.from(`${projectId}:${serverKey}`).toString("base64")}`;
-}
-
-async function getParticleUserInfo(session: ParticleSession) {
-  const response = await fetch("https://api.particle.network/server/rpc", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: authHeader(),
-    },
-    body: JSON.stringify({
-      jsonrpc: "2.0",
-      id: Date.now(),
-      method: "getUserInfo",
-      params: [session.uuid, session.token],
-    }),
-  });
-
-  if (!response.ok) {
-    throw new Error(`Particle session verification failed (${response.status}).`);
-  }
-
-  const body = (await response.json()) as {
-    result?: ParticleUserInfo;
-    error?: { message?: string };
-  };
-  if (body.error) throw new Error(body.error.message || "Particle session verification failed.");
-  if (!body.result?.uuid) throw new Error("Particle session verification returned no user.");
-  if (body.result.uuid !== session.uuid) throw new Error("Particle session user mismatch.");
-  return body.result;
-}
-
-function userEmail(user: ParticleUserInfo) {
-  return (
-    user.email ??
-    user.google_email ??
-    user.googleEmail ??
-    user.apple_email ??
-    user.appleEmail ??
-    user.github_email ??
-    user.githubEmail ??
-    user.discord_email ??
-    user.discordEmail ??
-    null
-  );
-}
-
-function walletChain(wallet: ParticleWallet) {
-  return String(wallet.chain_name ?? wallet.chainName ?? wallet.chain ?? "").toLowerCase();
-}
-
-function walletAddress(wallet: ParticleWallet) {
-  return String(wallet.public_address ?? wallet.publicAddress ?? "").trim();
-}
-
-function evmAddress(user: ParticleUserInfo) {
-  const wallet = (user.wallets ?? []).find((entry) => {
-    const chain = walletChain(entry);
-    const address = walletAddress(entry);
-    return address.startsWith("0x") && (!chain || chain.includes("evm") || chain.includes("eth"));
-  });
-  if (!wallet) throw new Error("Particle EVM wallet is unavailable.");
-  return walletAddress(wallet).toLowerCase();
-}
-
-function solanaAddress(user: ParticleUserInfo) {
-  const wallet = (user.wallets ?? []).find((entry) => walletChain(entry).includes("solana"));
-  return wallet ? walletAddress(wallet) || null : null;
+function walletAddress(metadata: MagicUserMetadata, walletType: WalletType) {
+  const wallet = metadata.wallets?.find((entry) => entry.walletType === walletType);
+  return wallet?.publicAddress?.trim() ?? null;
 }
 
 export async function verifyFyoraIdentity(didToken: string): Promise<FyoraIdentity> {
-  const session = parseSession(didToken);
-  const user = await getParticleUserInfo(session);
+  const magic = await getMagicAdmin();
+  try {
+    magic.token.validate(didToken);
+  } catch {
+    throw new Error("Invalid Magic session.");
+  }
+
+  const [metadata, solanaMetadata] = await Promise.all([
+    magic.users.getMetadataByTokenAndWallet(didToken, WalletType.ETH),
+    magic.users
+      .getMetadataByTokenAndWallet(didToken, WalletType.SOLANA)
+      .catch(() => null as MagicUserMetadata | null),
+  ]);
+  const evmAddress =
+    walletAddress(metadata, WalletType.ETH) ?? metadata.publicAddress?.trim().toLowerCase();
+  if (!evmAddress || !/^0x[a-fA-F0-9]{40}$/.test(evmAddress)) {
+    throw new Error("Magic EVM wallet is unavailable.");
+  }
+
   return {
     didToken,
-    issuer: `particle:${session.uuid}`,
-    email: userEmail(user),
-    evmAddress: evmAddress(user),
-    solanaAddress: solanaAddress(user),
+    issuer: metadata.issuer ?? magic.token.getIssuer(didToken),
+    email: metadata.email?.trim().toLowerCase() ?? null,
+    evmAddress: evmAddress.toLowerCase(),
+    solanaAddress: solanaMetadata ? walletAddress(solanaMetadata, WalletType.SOLANA) : null,
   };
 }

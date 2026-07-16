@@ -13,6 +13,10 @@ const chainSchema = z.object({
   chainId: z.number().int().positive(),
   tokenAddress: z.string().trim().min(1).max(128),
 });
+const walletTransferSchema = chainSchema.extend({
+  amount: z.string().trim().min(1).max(80),
+  receiver: z.string().trim().min(1).max(128),
+});
 const universalAddressesSchema = z.object({
   evmUaAddress: z
     .string()
@@ -141,6 +145,71 @@ export const createPaymentIntentFn = createServerFn({ method: "POST" })
     const identity = await identityFor(data.didToken);
     const { createPaymentIntent } = await import("./data.server");
     return createPaymentIntent({ identity, ...data });
+  });
+
+export const loadPrimaryAssetsFn = createServerFn({ method: "POST" })
+  .validator(z.object({ didToken: didSchema }))
+  .handler(async ({ data }) => {
+    const identity = await identityFor(data.didToken);
+    const { getServerPrimaryAssets } = await import("./particle-universal.server");
+    return getServerPrimaryAssets(identity.evmAddress);
+  });
+
+export const createPaymentQuoteFn = createServerFn({ method: "POST" })
+  .validator(z.object({ didToken: didSchema, intentId: z.string().uuid() }))
+  .handler(async ({ data }) => {
+    const identity = await identityFor(data.didToken);
+    const { getPaymentForIdentity } = await import("./data.server");
+    const { createPaymentTransferTransaction } = await import("./particle-universal.server");
+    const payment = await getPaymentForIdentity(data.intentId, identity);
+    return createPaymentTransferTransaction(identity.evmAddress, payment);
+  });
+
+export const createWalletTransferQuoteFn = createServerFn({ method: "POST" })
+  .validator(z.object({ didToken: didSchema }).and(walletTransferSchema))
+  .handler(async ({ data }) => {
+    const identity = await identityFor(data.didToken);
+    const { createWalletTransferTransaction } = await import("./particle-universal.server");
+    return createWalletTransferTransaction(identity.evmAddress, data);
+  });
+
+export const submitUniversalTransactionFn = createServerFn({ method: "POST" })
+  .validator(
+    z.object({
+      didToken: didSchema,
+      transaction: z.unknown(),
+      signature: z.string().trim().min(20).max(512),
+      authorizations: z
+        .array(
+          z.object({
+            userOpHash: z.string().trim().min(10).max(256),
+            signature: z.string().trim().min(20).max(512),
+          }),
+        )
+        .max(32)
+        .optional(),
+    }),
+  )
+  .handler(async ({ data }) => {
+    const identity = await identityFor(data.didToken);
+    const { getBytes, verifyMessage } = await import("ethers");
+    const transaction = data.transaction as import("./particle-types").UniversalTransaction;
+    const ownerAddress =
+      transaction.smartAccountOptions?.ownerAddress?.toLowerCase() ?? identity.evmAddress;
+    if (ownerAddress !== identity.evmAddress.toLowerCase()) {
+      throw new Error("This Particle quote belongs to a different wallet. Refresh and try again.");
+    }
+    const recovered = verifyMessage(getBytes(transaction.rootHash), data.signature).toLowerCase();
+    if (recovered !== ownerAddress) {
+      throw new Error("Particle signature does not match the Universal Account owner.");
+    }
+    const { submitUniversalTransaction } = await import("./particle-universal.server");
+    return submitUniversalTransaction(
+      identity.evmAddress,
+      transaction,
+      data.signature,
+      data.authorizations ?? [],
+    );
   });
 
 export const recordPaymentSubmissionFn = createServerFn({ method: "POST" })

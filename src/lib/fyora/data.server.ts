@@ -126,6 +126,7 @@ async function updateProfileOwner(profile: ProfileRow, identity: FyoraIdentity) 
   const ownerEmail = normalizedEmail(identity.email);
   if (
     profile.owner_particle_uuid === identity.issuer &&
+    profile.owner_magic_issuer === identity.issuer &&
     profile.owner_evm_address === identity.evmAddress &&
     profile.owner_solana_address === identity.solanaAddress &&
     profile.owner_email === ownerEmail
@@ -136,6 +137,7 @@ async function updateProfileOwner(profile: ProfileRow, identity: FyoraIdentity) 
     .from("profiles")
     .update({
       owner_particle_uuid: identity.issuer,
+      owner_magic_issuer: identity.issuer,
       owner_evm_address: identity.evmAddress,
       owner_solana_address: identity.solanaAddress,
       owner_email: ownerEmail,
@@ -172,6 +174,7 @@ export async function listPublicCreators() {
 
 export async function getCreatorForIdentity(identity: FyoraIdentity) {
   const supabase = getSupabaseServerClient();
+  const ownerEmail = normalizedEmail(identity.email);
   const { data, error } = await supabase
     .from("profiles")
     .select("*")
@@ -180,6 +183,14 @@ export async function getCreatorForIdentity(identity: FyoraIdentity) {
   if (error) throw error;
   if (data) return loadCreator(data, true);
 
+  const { data: magicProfile, error: magicError } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("owner_magic_issuer", identity.issuer)
+    .maybeSingle();
+  if (magicError) throw magicError;
+  if (magicProfile) return loadCreator(await updateProfileOwner(magicProfile, identity), true);
+
   const { data: evmProfile, error: evmError } = await supabase
     .from("profiles")
     .select("*")
@@ -187,6 +198,17 @@ export async function getCreatorForIdentity(identity: FyoraIdentity) {
     .maybeSingle();
   if (evmError) throw evmError;
   if (evmProfile) return loadCreator(await updateProfileOwner(evmProfile, identity), true);
+
+  if (ownerEmail) {
+    const { data: emailProfile, error: emailError } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("owner_email", ownerEmail)
+      .maybeSingle();
+    if (emailError) throw emailError;
+    if (emailProfile) return loadCreator(await updateProfileOwner(emailProfile, identity), true);
+  }
+
   return null;
 }
 
@@ -238,6 +260,7 @@ export async function claimCreator(input: {
     .from("profiles")
     .insert({
       owner_particle_uuid: input.identity.issuer,
+      owner_magic_issuer: input.identity.issuer,
       owner_evm_address: input.identity.evmAddress,
       owner_solana_address: input.identity.solanaAddress,
       owner_email: normalizedEmail(input.identity.email),

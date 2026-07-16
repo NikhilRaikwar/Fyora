@@ -1,25 +1,34 @@
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
+import stdLibBrowser from "node-stdlib-browser";
 import { nodePolyfills } from "vite-plugin-node-polyfills";
-import type { PluginOption } from "vite";
 
-export default defineConfig(({ isSsrBuild }) => {
-  return {
-    vite: {
-      plugins: [
-        !isSsrBuild &&
-          nodePolyfills({
-            globals: {
-              Buffer: true,
-              global: true,
-              process: true,
-            },
-          }),
-      ].filter(Boolean) as PluginOption[],
+export default defineConfig({
+  vite: {
+    define: {
+      global: "globalThis",
     },
-    tanstackStart: {
-      // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
-      // nitro/vite builds from this
-      server: { entry: "server" },
+    resolve: {
+      alias: {
+        buffer: stdLibBrowser.buffer,
+        "node:buffer": stdLibBrowser.buffer,
+        events: stdLibBrowser.events,
+        "node:events": stdLibBrowser.events,
+      },
     },
-  };
+    plugins: [
+      nodePolyfills({
+        globals: {
+          Buffer: true,
+          global: true,
+          process: true,
+        },
+        protocolImports: true,
+      }),
+    ],
+  },
+  tanstackStart: {
+    // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
+    // nitro/vite builds from this
+    server: { entry: "server" },
+  },
 });
