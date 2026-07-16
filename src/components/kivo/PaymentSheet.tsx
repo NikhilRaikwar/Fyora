@@ -6,7 +6,7 @@ import confetti from "canvas-confetti";
 import { chainById, tokenById } from "@/lib/fyora/chains";
 import type { Creator } from "@/lib/fyora/types";
 import { useFyoraAuth } from "@/lib/fyora/AuthProvider";
-import { createPaymentQuoteFn, loadPrimaryAssetsFn } from "@/lib/fyora/particle-functions";
+import { loadPrimaryAssetsFn } from "@/lib/fyora/particle-functions";
 import {
   createPaymentIntentFn,
   recordPaymentSubmissionFn,
@@ -52,7 +52,7 @@ export function PaymentSheet({
   const [supporterEmoji, setSupporterEmoji] = useState(SUPPORTER_EMOJIS[0]);
   const [idempotencyKey, setIdempotencyKey] = useState("");
   const { identity, refreshIdentity, signInWithEmail, ensureEip7702Delegated } = useFyoraAuth();
-  const { sendPaymentQuote } = useParticleSender();
+  const { sendTransfer } = useParticleSender();
   const router = useRouter();
 
   const chain = chainById(creator.settlement.chain);
@@ -192,11 +192,13 @@ export function PaymentSheet({
           idempotencyKey,
         },
       });
-      const quote = await createPaymentQuoteFn({
-        data: { didToken: currentIdentity.didToken, intentId: intent.id },
-      });
       setSignIdx(1);
-      const submitted = await sendPaymentQuote(quote, currentIdentity.didToken);
+      const { result: submitted } = await sendTransfer({
+        chainId: intent.destination.chainId,
+        tokenAddress: intent.destination.tokenAddress,
+        amount: String(intent.amountUsd),
+        receiver: intent.destination.address,
+      });
       setTxId(submitted.transactionId);
       setSignIdx(2);
       const recorded = await recordPaymentSubmissionFn({

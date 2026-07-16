@@ -27,7 +27,6 @@ import {
   type WalletActivity,
 } from "@/lib/fyora/particle";
 import {
-  createWalletTransferQuoteFn,
   loadPrimaryAssetsFn,
   loadWalletActivityFn,
   loadWalletTransactionFn,
@@ -140,7 +139,7 @@ function WalletCenter() {
 }
 
 function AuthenticatedWalletCenter({ identity }: { identity: FyoraIdentity }) {
-  const { sendPaymentQuote } = useParticleSender();
+  const { createTransferQuote, sendPaymentQuote } = useParticleSender();
   const { ensureEip7702Delegated } = useFyoraAuth();
   const [receiveNetwork, setReceiveNetwork] = useState<"evm" | "solana">("evm");
   const [tokenId, setTokenId] = useState<(typeof TOKEN_IDS)[number]>("usdc");
@@ -278,14 +277,11 @@ function AuthenticatedWalletCenter({ identity }: { identity: FyoraIdentity }) {
       validateTransfer();
       setStage("quoting");
       await ensureEip7702Delegated(identity.evmAddress);
-      const next = await createWalletTransferQuoteFn({
-        data: {
-          didToken: identity.didToken,
-          chainId: selectedAsset.chainId,
-          tokenAddress: selectedAsset.tokenAddress,
-          amount,
-          receiver: receiver.trim(),
-        },
+      const next = await createTransferQuote({
+        chainId: selectedAsset.chainId,
+        tokenAddress: selectedAsset.tokenAddress,
+        amount,
+        receiver: receiver.trim(),
       });
       setQuote(next);
       setStage("quoted");
@@ -323,17 +319,14 @@ function AuthenticatedWalletCenter({ identity }: { identity: FyoraIdentity }) {
     try {
       setStage("signing");
       await ensureEip7702Delegated(identity.evmAddress);
-      const freshQuote = await createWalletTransferQuoteFn({
-        data: {
-          didToken: identity.didToken,
-          chainId: selectedAsset.chainId,
-          tokenAddress: selectedAsset.tokenAddress,
-          amount,
-          receiver: receiver.trim(),
-        },
+      const freshQuote = await createTransferQuote({
+        chainId: selectedAsset.chainId,
+        tokenAddress: selectedAsset.tokenAddress,
+        amount,
+        receiver: receiver.trim(),
       });
       setQuote(freshQuote);
-      const result = await sendPaymentQuote(freshQuote, identity.didToken);
+      const result = await sendPaymentQuote(freshQuote);
       setStage("submitting");
       setTransactionId(result.transactionId);
       setStage("pending");

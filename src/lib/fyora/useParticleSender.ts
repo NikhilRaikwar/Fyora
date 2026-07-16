@@ -1,7 +1,17 @@
 import { useCallback, useRef } from "react";
 import { useFyoraAuth } from "./AuthProvider";
-import { submitUniversalTransactionFn } from "./particle-functions";
 import type { UniversalAuthorization, UniversalTransaction } from "./particle-types";
+import {
+  createBrowserTransferTransaction,
+  sendBrowserUniversalTransaction,
+} from "./magic-universal-client";
+
+type TransferInput = {
+  chainId: number;
+  tokenAddress: string;
+  amount: string;
+  receiver: string;
+};
 
 function sameAddress(left?: string, right?: string) {
   return Boolean(left && right && left.toLowerCase() === right.toLowerCase());
@@ -32,8 +42,19 @@ export function useParticleSender() {
     useFyoraAuth();
   const sendInFlight = useRef(false);
 
+  const createTransferQuote = useCallback(
+    async (input: TransferInput) => {
+      if (!identity?.evmAddress) {
+        throw new Error("Magic wallet is not ready yet.");
+      }
+      await ensureEip7702Delegated(identity.evmAddress);
+      return createBrowserTransferTransaction(identity.evmAddress, input);
+    },
+    [ensureEip7702Delegated, identity?.evmAddress],
+  );
+
   const sendPaymentQuote = useCallback(
-    async (transaction: UniversalTransaction, didToken: string) => {
+    async (transaction: UniversalTransaction) => {
       if (!identity?.evmAddress) {
         throw new Error("Magic wallet is not ready yet.");
       }
@@ -95,9 +116,12 @@ export function useParticleSender() {
         }
 
         try {
-          return await submitUniversalTransactionFn({
-            data: { didToken, transaction, signature: rootSignature, authorizations },
-          });
+          return await sendBrowserUniversalTransaction(
+            ownerAddress,
+            transaction,
+            rootSignature,
+            authorizations,
+          );
         } catch (error) {
           throw particleError(error, {
             signerProvider: "magic",
@@ -120,9 +144,20 @@ export function useParticleSender() {
     [ensureEip7702Delegated, identity?.evmAddress, signEip7702Authorization, signRootHash],
   );
 
+  const sendTransfer = useCallback(
+    async (input: TransferInput) => {
+      const transaction = await createTransferQuote(input);
+      const result = await sendPaymentQuote(transaction);
+      return { transaction, result };
+    },
+    [createTransferQuote, sendPaymentQuote],
+  );
+
   return {
     embeddedWallet: identity?.evmAddress ? { address: identity.evmAddress } : null,
     signerLabel: "Magic embedded wallet",
+    createTransferQuote,
     sendPaymentQuote,
+    sendTransfer,
   };
 }
