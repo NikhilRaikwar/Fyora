@@ -88,13 +88,11 @@ export function useParticleSender() {
               nonce: operation.eip7702Auth.nonce,
             });
             const { Signature } = await import("ethers");
-            signature =
-              authorization.signature ??
-              Signature.from({
-                r: authorization.r,
-                s: authorization.s,
-                v: authorization.v,
-              }).serialized;
+            signature = Signature.from({
+              r: authorization.r,
+              s: authorization.s,
+              v: authorization.v,
+            }).serialized;
             authorizationCache.set(cacheKey, signature);
           }
           authorizations.push({

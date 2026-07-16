@@ -24,6 +24,17 @@ type MagicClient = MagicBase<[EVMExtension]> & {
 };
 
 const BASE_CHAIN_ID = 8453;
+const MAGIC_EVM_CHAINS = [
+  { chainId: 8453, rpcEnv: "VITE_BASE_RPC_URL", fallbackRpc: "https://mainnet.base.org" },
+  { chainId: 42161, rpcEnv: "VITE_ARBITRUM_RPC_URL", fallbackRpc: "https://arb1.arbitrum.io/rpc" },
+  {
+    chainId: 1,
+    rpcEnv: "VITE_ETHEREUM_RPC_URL",
+    fallbackRpc: "https://ethereum-rpc.publicnode.com",
+  },
+  { chainId: 56, rpcEnv: "VITE_BNB_RPC_URL", fallbackRpc: "https://bsc-dataseed.binance.org" },
+  { chainId: 196, rpcEnv: "VITE_XLAYER_RPC_URL", fallbackRpc: "https://rpc.xlayer.tech" },
+] as const;
 let magicClient: MagicClient | null = null;
 
 function env(name: string) {
@@ -40,13 +51,13 @@ function getMagicClient() {
   if (!magicClient) {
     magicClient = new MagicBase(env("VITE_MAGIC_PUBLISHABLE_KEY"), {
       extensions: [
-        new EVMExtension([
-          {
-            rpcUrl: optionalEnv("VITE_BASE_RPC_URL", "https://mainnet.base.org"),
-            chainId: BASE_CHAIN_ID,
-            default: true,
-          },
-        ]),
+        new EVMExtension(
+          MAGIC_EVM_CHAINS.map((chain) => ({
+            rpcUrl: optionalEnv(chain.rpcEnv, chain.fallbackRpc),
+            chainId: chain.chainId,
+            default: chain.chainId === BASE_CHAIN_ID,
+          })),
+        ),
       ],
     }) as MagicClient;
   }
@@ -162,12 +173,14 @@ function FyoraAuthProviderInner({ children }: { children: ReactNode }) {
   );
 
   const signEip7702Authorization = useCallback(
-    async (authorization: { address: string; chainId: number; nonce: number }) =>
-      magic.wallet.sign7702Authorization({
+    async (authorization: { address: string; chainId: number; nonce: number }) => {
+      await magic.evm.switchChain(authorization.chainId);
+      return magic.wallet.sign7702Authorization({
         contractAddress: authorization.address,
         chainId: authorization.chainId,
         nonce: authorization.nonce,
-      }),
+      });
+    },
     [magic],
   );
 
