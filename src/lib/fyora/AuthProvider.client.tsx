@@ -3,7 +3,7 @@ import { EVMExtension } from "@magic-ext/evm";
 import { Magic as MagicBase, type MagicUserMetadata } from "magic-sdk";
 import { BrowserProvider, getBytes } from "ethers";
 import { AuthContext, type AuthContextValue } from "./AuthProvider";
-import { getBaseEip7702DelegationFn } from "./server-functions";
+import { getBaseEip7702DelegationFn } from "./particle-functions";
 import type { FyoraIdentity } from "./types";
 
 type MagicClient = MagicBase<[EVMExtension]> & {

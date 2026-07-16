@@ -1,6 +1,6 @@
 import { useCallback, useRef } from "react";
 import { useFyoraAuth } from "./AuthProvider";
-import { submitUniversalTransactionFn } from "./server-functions";
+import { submitUniversalTransactionFn } from "./particle-functions";
 import type { UniversalAuthorization, UniversalTransaction } from "./particle-types";
 
 function sameAddress(left?: string, right?: string) {

@@ -31,7 +31,7 @@ import {
   loadPrimaryAssetsFn,
   loadWalletActivityFn,
   loadWalletTransactionFn,
-} from "@/lib/fyora/server-functions";
+} from "@/lib/fyora/particle-functions";
 import { useParticleSender } from "@/lib/fyora/useParticleSender";
 import { PRIMARY_ASSETS } from "@/lib/fyora/settlement";
 import type { FyoraIdentity } from "@/lib/fyora/types";

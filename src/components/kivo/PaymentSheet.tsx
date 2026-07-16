@@ -6,10 +6,9 @@ import confetti from "canvas-confetti";
 import { chainById, tokenById } from "@/lib/fyora/chains";
 import type { Creator } from "@/lib/fyora/types";
 import { useFyoraAuth } from "@/lib/fyora/AuthProvider";
+import { createPaymentQuoteFn, loadPrimaryAssetsFn } from "@/lib/fyora/particle-functions";
 import {
-  createPaymentQuoteFn,
   createPaymentIntentFn,
-  loadPrimaryAssetsFn,
   recordPaymentSubmissionFn,
   refreshPaymentFn,
 } from "@/lib/fyora/server-functions";
