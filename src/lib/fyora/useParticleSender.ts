@@ -144,12 +144,16 @@ export function useParticleSender() {
         const authorizationCache = new Map<string, string>();
         for (const operation of transaction.userOps) {
           if (!operation.eip7702Auth || operation.eip7702Delegated) continue;
-          const cacheKey = `${operation.eip7702Auth.chainId}:${operation.eip7702Auth.nonce}:${operation.eip7702Auth.address.toLowerCase()}`;
+          const authorizationChainId =
+            operation.eip7702Auth.chainId === 0
+              ? operation.chainId
+              : (operation.eip7702Auth.chainId ?? operation.chainId);
+          const cacheKey = `${authorizationChainId}:${operation.eip7702Auth.nonce}:${operation.eip7702Auth.address.toLowerCase()}`;
           let signature = authorizationCache.get(cacheKey);
           if (!signature) {
             const authorizationRequest = {
               address: operation.eip7702Auth.address,
-              chainId: operation.eip7702Auth.chainId ?? operation.chainId,
+              chainId: authorizationChainId,
               nonce: operation.eip7702Auth.nonce,
             };
             const authorization = await signEip7702Authorization({

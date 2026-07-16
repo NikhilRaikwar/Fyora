@@ -174,6 +174,11 @@ function FyoraAuthProviderInner({ children }: { children: ReactNode }) {
 
   const signEip7702Authorization = useCallback(
     async (authorization: { address: string; chainId: number; nonce: number }) => {
+      if (authorization.chainId <= 0) {
+        throw new Error(
+          `Magic cannot sign EIP-7702 authorization for chainId ${authorization.chainId}. Use the concrete Particle userOp chainId before calling Magic.`,
+        );
+      }
       await magic.evm.switchChain(authorization.chainId);
       return magic.wallet.sign7702Authorization({
         contractAddress: authorization.address,
