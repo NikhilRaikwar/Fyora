@@ -1,5 +1,4 @@
 import { createClientOnlyFn } from "@tanstack/react-start";
-import { resolveUniversalAddresses } from "./particle-addresses";
 import { PRIMARY_ASSETS } from "./settlement";
 import type { PaymentIntent } from "./types";
 import type { UniversalAssetsResponse } from "./particle-types";
@@ -28,14 +27,30 @@ export type UniversalAccountAddresses = {
   lookupWarning?: string;
 };
 
+function normalizeEvmOwnerAddress(ownerAddress: string) {
+  const normalized = ownerAddress.trim().toLowerCase();
+  if (!/^0x[a-f0-9]{40}$/.test(normalized)) {
+    throw new Error("Magic did not return a valid EIP-7702 owner address yet.");
+  }
+  return normalized;
+}
+
 export const loadPrimaryAssets = createClientOnlyFn(async (): Promise<UniversalAssetsResponse> => ({
   totalAmountInUSD: 0,
   assets: [],
 }));
 
 export const loadUniversalAccountAddresses = createClientOnlyFn(
-  async (ownerAddress: string): Promise<UniversalAccountAddresses> =>
-    resolveUniversalAddresses(ownerAddress),
+  async (ownerAddress: string): Promise<UniversalAccountAddresses> => {
+    const normalizedOwner = normalizeEvmOwnerAddress(ownerAddress);
+    return {
+      ownerAddress: normalizedOwner,
+      evmUaAddress: normalizedOwner,
+      solanaUaAddress: null,
+      mode: "eip7702OwnerAddress",
+      lookupWarning: "Using the Magic EIP-7702 owner address as the Universal receive address.",
+    };
+  },
 );
 
 export const createPaymentQuote = createClientOnlyFn(
