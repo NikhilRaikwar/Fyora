@@ -12,6 +12,7 @@ import { AuthLoginCard } from "@/components/kivo/AuthLoginCard";
 import { useCurrentCreator } from "@/lib/fyora/hooks";
 import { loadUniversalAccountAddresses } from "@/lib/fyora/particle";
 import {
+  refreshCreatorPaymentsFn,
   refreshCreatorSettlementFn,
   refreshCreatorShareCardFn,
 } from "@/lib/fyora/server-functions";
@@ -40,6 +41,7 @@ function Dashboard() {
   const [regeneratingCard, setRegeneratingCard] = useState(false);
   const [cardPreviewNonce, setCardPreviewNonce] = useState(0);
   const [refreshingSettlement, setRefreshingSettlement] = useState(false);
+  const [refreshingPayments, setRefreshingPayments] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -190,6 +192,26 @@ function Dashboard() {
       toast.error(error instanceof Error ? error.message : "Could not refresh settlement address.");
     } finally {
       setRefreshingSettlement(false);
+    }
+  };
+
+  const refreshPayments = async () => {
+    try {
+      setRefreshingPayments(true);
+      const currentIdentity = await refreshIdentity();
+      const result = await refreshCreatorPaymentsFn({
+        data: { didToken: currentIdentity.didToken },
+      });
+      await refetch();
+      toast.success(
+        result.updated
+          ? `Updated ${result.updated} payment${result.updated === 1 ? "" : "s"}`
+          : "Payments refreshed",
+      );
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not refresh payments.");
+    } finally {
+      setRefreshingPayments(false);
     }
   };
 
@@ -424,13 +446,12 @@ function Dashboard() {
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-display italic text-2xl sm:text-3xl">Recent payments</h2>
             <button
-              onClick={() => {
-                refetch();
-                toast("Payments refreshed");
-              }}
-              className="inline-flex items-center gap-1 text-xs rounded-full bg-card chunky shadow-sticker-sm px-3 py-1.5 font-semibold press"
+              onClick={refreshPayments}
+              disabled={refreshingPayments}
+              className="inline-flex items-center gap-1 text-xs rounded-full bg-card chunky shadow-sticker-sm px-3 py-1.5 font-semibold press disabled:opacity-60"
             >
-              <RefreshCw className="w-3 h-3" /> Refresh
+              <RefreshCw className={`w-3 h-3 ${refreshingPayments ? "animate-spin" : ""}`} />{" "}
+              Refresh
             </button>
           </div>
           {creator.payments.length === 0 ? (

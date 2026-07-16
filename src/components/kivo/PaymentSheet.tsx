@@ -187,7 +187,6 @@ export function PaymentSheet({
           handle: creator.handle,
           amountUsd: amount,
           note: note || undefined,
-          supporterName: identity.email?.split("@")[0],
           supporterEmoji,
           idempotencyKey,
         },

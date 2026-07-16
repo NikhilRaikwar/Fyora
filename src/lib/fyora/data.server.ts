@@ -341,6 +341,38 @@ export async function refreshCreatorShareCard(identity: FyoraIdentity) {
   return getCreatorForIdentity(identity);
 }
 
+async function supporterDisplayNameForIdentity(identity: FyoraIdentity) {
+  const supabase = getSupabaseServerClient();
+  const ownerEmail = normalizedEmail(identity.email);
+  const baseQuery = supabase
+    .from("profiles")
+    .select("display_name, handle")
+    .limit(1);
+
+  const { data: evmProfiles, error: evmError } = await baseQuery.eq(
+    "owner_evm_address",
+    identity.evmAddress,
+  );
+  if (evmError) throw evmError;
+  const evmProfile = evmProfiles?.[0];
+  if (evmProfile?.display_name) return evmProfile.display_name;
+  if (evmProfile?.handle) return `@${evmProfile.handle}`;
+
+  if (ownerEmail) {
+    const { data: emailProfiles, error: emailError } = await supabase
+      .from("profiles")
+      .select("display_name, handle")
+      .eq("owner_email", ownerEmail)
+      .limit(1);
+    if (emailError) throw emailError;
+    const emailProfile = emailProfiles?.[0];
+    if (emailProfile?.display_name) return emailProfile.display_name;
+    if (emailProfile?.handle) return `@${emailProfile.handle}`;
+  }
+
+  return ownerEmail?.split("@")[0] ?? null;
+}
+
 export async function updateCreatorAvatar(input: {
   identity: FyoraIdentity;
   fileName: string;
@@ -386,6 +418,8 @@ export async function createPaymentIntent(input: {
 }): Promise<PaymentIntent> {
   const creator = await getPublicCreator(input.handle);
   if (!creator) throw new Error("Creator not found.");
+  const supporterName =
+    (await supporterDisplayNameForIdentity(input.identity)) ?? input.supporterName ?? null;
   const { data, error } = await getSupabaseServerClient()
     .from("payments")
     .upsert(
@@ -393,7 +427,7 @@ export async function createPaymentIntent(input: {
         idempotency_key: input.idempotencyKey,
         profile_id: creator.profileId,
         supporter_evm_address: input.identity.evmAddress,
-        supporter_name: input.supporterName || null,
+        supporter_name: supporterName,
         supporter_emoji: input.supporterEmoji,
         note: input.note || null,
         amount_usd: input.amountUsd,

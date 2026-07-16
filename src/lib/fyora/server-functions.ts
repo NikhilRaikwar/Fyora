@@ -186,3 +186,41 @@ export const refreshPaymentFn = createServerFn({ method: "POST" })
     const verified = await verifyParticlePayment(payment);
     return updatePaymentVerification(payment.id, verified);
   });
+
+export const refreshCreatorPaymentsFn = createServerFn({ method: "POST" })
+  .validator(z.object({ didToken: didSchema }))
+  .handler(async ({ data }) => {
+    const identity = await identityFor(data.didToken);
+    const { getCreatorForIdentity, updatePaymentVerification } = await import("./data.server");
+    const { verifyParticlePayment } = await import("./particle.server");
+    const { getSupabaseServerClient } = await import("./supabase.server");
+    const creator = await getCreatorForIdentity(identity);
+    if (!creator) throw new Error("Creator profile not found.");
+
+    const { data: payments, error } = await getSupabaseServerClient()
+      .from("payments")
+      .select("*")
+      .eq("profile_id", creator.profileId)
+      .in("status", ["submitted", "refunding"])
+      .not("particle_transaction_id", "is", null)
+      .order("submitted_at", { ascending: false })
+      .limit(25);
+    if (error) throw error;
+
+    let updated = 0;
+    for (const payment of payments ?? []) {
+      try {
+        const verified = await verifyParticlePayment(payment);
+        await updatePaymentVerification(payment.id, verified);
+        updated += 1;
+      } catch (error) {
+        console.error("[Fyora] Could not refresh submitted creator payment", {
+          paymentId: payment.id,
+          transactionId: payment.particle_transaction_id,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
+    return { checked: payments?.length ?? 0, updated };
+  });
