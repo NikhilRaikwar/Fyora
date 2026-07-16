@@ -1,6 +1,13 @@
 # Fyora
 
 <p align="center">
+  <a href="https://www.fyora.app/"><img alt="Live Demo" src="https://img.shields.io/badge/live-fyora.app-C6F24E?style=for-the-badge&labelColor=141313&color=C6F24E"></a>
+  <a href="https://developers.particle.network/"><img alt="Particle Universal Accounts" src="https://img.shields.io/badge/Particle-Universal%20Accounts-B8A6FF?style=for-the-badge&labelColor=141313&color=B8A6FF"></a>
+  <a href="https://docs.magic.link/embedded-wallets/introduction"><img alt="Magic Embedded Wallets" src="https://img.shields.io/badge/Magic-Embedded%20Wallets-FF6B4A?style=for-the-badge&labelColor=141313&color=FF6B4A"></a>
+  <img alt="License MIT" src="https://img.shields.io/badge/license-MIT-FFD166?style=for-the-badge&labelColor=141313&color=FFD166">
+</p>
+
+<p align="center">
   <a href="https://www.fyora.app/">
     <img src="./public/fyora-share-default.jpg" alt="Fyora banner" width="100%" />
   </a>
@@ -11,10 +18,6 @@
 - Live app: [fyora.app](https://www.fyora.app/)
 - Example creator: [fyora.app/nikhil](https://www.fyora.app/nikhil)
 - Demo proof: [UniversalX transaction 0x0656c14584b419](https://universalx.app/activity/details?id=0x0656c14584b419)
-
-<p align="center">
-  <img src="./public/fyora-share-nikhil.jpg" alt="Example Fyora creator share card" width="820" />
-</p>
 
 ## Hackathon Tracks
 
@@ -117,11 +120,7 @@ Fyora keeps the wallet model simple for users:
 
 ## Real Demo Proof
 
-The working demo transaction is:
-
-```text
-https://universalx.app/activity/details?id=0x0656c14584b419
-```
+The working demo transaction is [UniversalX transaction `0x0656c14584b419`](https://universalx.app/activity/details?id=0x0656c14584b419).
 
 It shows:
 
@@ -151,9 +150,7 @@ Each creator gets:
 
 Every public profile has absolute, versioned social metadata:
 
-```text
-https://www.fyora.app/api/public/og/{handle}.png?v={updatedAt}
-```
+[`https://www.fyora.app/api/public/og/{handle}.png?v={updatedAt}`](https://www.fyora.app/api/public/og/nikhil.png)
 
 The generated card uses Supabase profile data, creator avatar/photo, handle, name, gradient, bundled fonts, and a real `1200x630` PNG renderer for social previews.
 
@@ -226,3 +223,22 @@ npx tsc --noEmit
 npm run lint
 git diff --check
 ```
+
+## Useful Links
+
+- [Fyora live app](https://www.fyora.app/)
+- [Example Fyora creator page](https://www.fyora.app/nikhil)
+- [UniversalX demo proof](https://universalx.app/activity/details?id=0x0656c14584b419)
+- [Particle Developer Docs](https://developers.particle.network/)
+- [Particle Universal Accounts Overview](https://developers.particle.network/universal-accounts/cha/overview)
+- [Particle Universal Accounts Web Quickstart](https://developers.particle.network/universal-accounts/cha/web-quickstart)
+- [Particle transfer reference](https://developers.particle.network/universal-accounts/ua-reference/web/transactions/transfer)
+- [Magic Embedded Wallets](https://docs.magic.link/embedded-wallets/introduction)
+
+## License
+
+MIT License. Copyright (c) 2026 Nikhil Raikwar.
+
+---
+
+Fyora is built around one simple idea: creators should be able to share one page and receive support without asking supporters to understand chains, bridges, or gas. Particle Universal Accounts handles the chain abstraction, Magic keeps onboarding familiar, and Fyora turns that into a consumer payment experience.
