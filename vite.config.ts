@@ -57,9 +57,6 @@ export default defineConfig({
         "rpc-websockets",
       ],
     },
-    optimizeDeps: {
-      include: ["magic-sdk", "@magic-ext/evm", "@particle-network/universal-account-sdk"],
-    },
   },
   tanstackStart: {
     // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
