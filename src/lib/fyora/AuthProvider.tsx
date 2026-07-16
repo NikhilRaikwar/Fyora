@@ -21,7 +21,7 @@ export type AuthContextValue = {
     chainId: number;
     nonce: number;
   }) => Promise<{ r: string; s: string; v: number; signature?: string }>;
-  ensureEip7702Delegated: (ownerAddress: string) => Promise<void>;
+  ensureEip7702Delegated: (ownerAddress: string, chainId?: number) => Promise<void>;
 };
 
 export const AuthContext = createContext<AuthContextValue | null>(null);

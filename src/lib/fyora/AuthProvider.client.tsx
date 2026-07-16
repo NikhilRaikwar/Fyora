@@ -190,11 +190,11 @@ function FyoraAuthProviderInner({ children }: { children: ReactNode }) {
   );
 
   const ensureEip7702Delegated = useCallback(
-    async (ownerAddress: string) => {
+    async (ownerAddress: string, chainId = BASE_CHAIN_ID) => {
       const normalizedOwner = ownerAddress.toLowerCase();
       const currentIdentity = identity?.didToken ? identity : await buildIdentity();
       const delegation = await getBaseEip7702DelegationFn({
-        data: { didToken: currentIdentity.didToken, ownerAddress: normalizedOwner },
+        data: { didToken: currentIdentity.didToken, ownerAddress: normalizedOwner, chainId },
       });
       if (!isDelegationResponse(delegation)) {
         throw new Error("Particle returned an invalid EIP-7702 delegation response.");
@@ -203,10 +203,10 @@ function FyoraAuthProviderInner({ children }: { children: ReactNode }) {
       const auth = delegation.authorization;
       if (!auth?.address) throw new Error("Particle did not return a Base EIP-7702 auth.");
 
-      await magic.evm.switchChain(BASE_CHAIN_ID);
+      await magic.evm.switchChain(chainId);
       const authorization = await magic.wallet.sign7702Authorization({
         contractAddress: auth.address,
-        chainId: auth.chainId || BASE_CHAIN_ID,
+        chainId: auth.chainId || chainId,
         nonce: auth.nonce,
       });
       await magic.wallet.send7702Transaction({

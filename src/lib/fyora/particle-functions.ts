@@ -32,14 +32,20 @@ export const loadPrimaryAssetsFn = createServerFn({ method: "POST" })
   });
 
 export const getBaseEip7702DelegationFn = createServerFn({ method: "POST" })
-  .validator(z.object({ didToken: didSchema, ownerAddress: evmAddressSchema }))
+  .validator(
+    z.object({
+      didToken: didSchema,
+      ownerAddress: evmAddressSchema,
+      chainId: z.number().int().positive().optional(),
+    }),
+  )
   .handler(async ({ data }) => {
     const identity = await identityFor(data.didToken);
     if (identity.evmAddress.toLowerCase() !== data.ownerAddress.toLowerCase()) {
       throw new Error("This delegation request belongs to a different wallet.");
     }
     const { getServerBaseEip7702Delegation } = await import("./particle-universal.server");
-    return getServerBaseEip7702Delegation(identity.evmAddress);
+    return getServerBaseEip7702Delegation(identity.evmAddress, data.chainId ?? 8453);
   });
 
 export const loadWalletTransactionFn = createServerFn({ method: "POST" })

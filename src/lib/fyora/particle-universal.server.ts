@@ -37,29 +37,32 @@ export async function getServerPrimaryAssets(ownerAddress: string) {
   return (await createUniversalAccountServer(ownerAddress)).getPrimaryAssets();
 }
 
-export async function getServerBaseEip7702Delegation(ownerAddress: string): Promise<Json> {
+export async function getServerBaseEip7702Delegation(
+  ownerAddress: string,
+  chainId = 8453,
+): Promise<Json> {
   const account = await createUniversalAccountServer(ownerAddress);
   const deployments = (await account.getEIP7702Deployments()) as Array<{
     chainId?: number;
     isDelegated?: boolean;
   }>;
-  const baseDeployment = deployments.find((deployment) => deployment.chainId === 8453);
-  if (baseDeployment?.isDelegated) {
+  const deployment = deployments.find((item) => item.chainId === chainId);
+  if (deployment?.isDelegated) {
     return { delegated: true };
   }
 
-  const [auth] = (await account.getEIP7702Auth([8453])) as Array<{
+  const [auth] = (await account.getEIP7702Auth([chainId])) as Array<{
     address?: string;
     nonce?: number | string;
   }>;
   if (!auth?.address) {
-    throw new Error("Particle did not return a Base EIP-7702 authorization.");
+    throw new Error(`Particle did not return an EIP-7702 authorization for chain ${chainId}.`);
   }
   return {
     delegated: false,
     authorization: {
       address: auth.address,
-      chainId: 8453,
+      chainId,
       nonce: Number(auth.nonce) + 1,
     },
   };
