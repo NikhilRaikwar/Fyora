@@ -1,5 +1,4 @@
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
-import stdLibBrowser from "node-stdlib-browser";
 
 export default defineConfig({
   vite: {
@@ -8,10 +7,12 @@ export default defineConfig({
     },
     resolve: {
       alias: {
-        buffer: stdLibBrowser.buffer,
-        "node:buffer": stdLibBrowser.buffer,
-        events: stdLibBrowser.events,
-        "node:events": stdLibBrowser.events,
+        buffer: "buffer/",
+        "node:buffer": "buffer/",
+        events: "events/",
+        "node:events": "events/",
+        process: "process/browser",
+        "node:process": "process/browser",
       },
     },
   },
