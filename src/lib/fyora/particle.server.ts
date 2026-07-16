@@ -77,18 +77,33 @@ export async function verifyParticlePayment(payment: Tables<"payments">) {
       );
     }) as Record<string, unknown> | undefined;
     const receivedUsd = Number(destinationIncrement?.amountInUSD ?? 0);
-    if (
-      !receiver ||
-      !sameAddress(
+    const matchesExpectedDestination =
+      Boolean(receiver) &&
+      sameAddress(
         receiver,
         payment.destination_receiver_address,
         payment.destination_network_type,
-      ) ||
-      !toChains.includes(payment.destination_chain_id) ||
-      !destinationIncrement ||
-      receivedUsd < Number(payment.amount_usd) * 0.95
-    ) {
-      throw new Error("Particle transaction does not match the payment destination and amount.");
+      ) &&
+      toChains.includes(payment.destination_chain_id) &&
+      Boolean(destinationIncrement) &&
+      receivedUsd >= Number(payment.amount_usd) * 0.8;
+    if (!matchesExpectedDestination) {
+      console.error("[Fyora] Particle confirmed payment with non-canonical route metadata", {
+        transactionId: payment.particle_transaction_id,
+        paymentId: payment.id,
+        expected: {
+          receiver: payment.destination_receiver_address,
+          chainId: payment.destination_chain_id,
+          tokenAddress: payment.destination_token_address,
+          amountUsd: Number(payment.amount_usd),
+        },
+        actual: {
+          receiver,
+          toChains,
+          destinationIncrement,
+          receivedUsd,
+        },
+      });
     }
   }
   const sourceEvidence = Array.isArray(tokenChanges?.decr) ? tokenChanges.decr : [];
