@@ -3,7 +3,7 @@ import { EVMExtension } from "@magic-ext/evm";
 import { Magic as MagicBase, type MagicUserMetadata } from "magic-sdk";
 import { BrowserProvider, getBytes } from "ethers";
 import { AuthContext, type AuthContextValue } from "./AuthProvider";
-import { createUniversalAccount } from "./particle-addresses";
+import { getBaseEip7702DelegationFn } from "./server-functions";
 import type { FyoraIdentity } from "./types";
 
 type MagicClient = MagicBase<[EVMExtension]> & {
@@ -73,6 +73,13 @@ async function signerAddress(magic: MagicClient) {
 
 function missingIdentityError() {
   return new Error("Magic wallet is still getting ready. Try again in a moment.");
+}
+
+function isDelegationResponse(value: unknown): value is {
+  delegated: boolean;
+  authorization?: { address: string; chainId: number; nonce: number };
+} {
+  return Boolean(value && typeof value === "object" && "delegated" in value);
 }
 
 function FyoraAuthProviderInner({ children }: { children: ReactNode }) {
@@ -167,24 +174,22 @@ function FyoraAuthProviderInner({ children }: { children: ReactNode }) {
   const ensureEip7702Delegated = useCallback(
     async (ownerAddress: string) => {
       const normalizedOwner = ownerAddress.toLowerCase();
-      const universalAccount = await createUniversalAccount(normalizedOwner);
-      const deployments = (await universalAccount.getEIP7702Deployments()) as Array<{
-        chainId?: number;
-        isDelegated?: boolean;
-      }>;
-      const baseDeployment = deployments.find(
-        (deployment: { chainId?: number; isDelegated?: boolean }) =>
-          deployment.chainId === BASE_CHAIN_ID,
-      );
-      if (baseDeployment?.isDelegated) return;
+      const currentIdentity = identity?.didToken ? identity : await buildIdentity();
+      const delegation = await getBaseEip7702DelegationFn({
+        data: { didToken: currentIdentity.didToken, ownerAddress: normalizedOwner },
+      });
+      if (!isDelegationResponse(delegation)) {
+        throw new Error("Particle returned an invalid EIP-7702 delegation response.");
+      }
+      if (delegation.delegated) return;
+      const auth = delegation.authorization;
+      if (!auth?.address) throw new Error("Particle did not return a Base EIP-7702 auth.");
 
       await magic.evm.switchChain(BASE_CHAIN_ID);
-      const [auth] = await universalAccount.getEIP7702Auth([BASE_CHAIN_ID]);
-      if (!auth?.address) throw new Error("Particle did not return a Base EIP-7702 auth.");
       const authorization = await magic.wallet.sign7702Authorization({
         contractAddress: auth.address,
-        chainId: BASE_CHAIN_ID,
-        nonce: Number(auth.nonce) + 1,
+        chainId: auth.chainId || BASE_CHAIN_ID,
+        nonce: auth.nonce,
       });
       await magic.wallet.send7702Transaction({
         to: normalizedOwner,
@@ -192,7 +197,7 @@ function FyoraAuthProviderInner({ children }: { children: ReactNode }) {
         authorizationList: [authorization],
       });
     },
-    [magic],
+    [buildIdentity, identity, magic],
   );
 
   const value = useMemo<AuthContextValue>(
