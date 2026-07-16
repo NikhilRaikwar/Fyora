@@ -1,4 +1,4 @@
-# Fyora
+<h1 align="center">Fyora</h1>
 
 <p align="center">
   <a href="https://www.fyora.app/"><img alt="Live Demo" src="https://img.shields.io/badge/live-fyora.app-C6F24E?style=for-the-badge&labelColor=141313&color=C6F24E"></a>
@@ -18,6 +18,23 @@
 - Live app: [fyora.app](https://www.fyora.app/)
 - Example creator: [fyora.app/nikhil](https://www.fyora.app/nikhil)
 - Demo proof: [UniversalX transaction 0x0656c14584b419](https://universalx.app/activity/details?id=0x0656c14584b419)
+
+## Problem
+
+Creator payments are still too chain-aware. A supporter may have USDC on Base, a creator may want to receive on Arbitrum, and both sides are usually forced to think about bridges, gas, RPC networks, wallet setup, and token locations before a simple payment can happen.
+
+That friction is especially bad for consumer creators. A creator money page should feel like sharing a normal profile link, not like explaining cross-chain infrastructure to every supporter.
+
+## Solution
+
+Fyora turns creator payments into a single-link experience:
+
+- creators share one Fyora page
+- supporters pay from their Universal Balance
+- Particle Universal Accounts handles chain abstraction and routing
+- Magic embedded wallets provide email-based onboarding and EIP-7702 signing
+- creators receive on their configured settlement chain/token
+- Supabase records confirmed payments for public stats and dashboard metrics
 
 ## Hackathon Tracks
 
