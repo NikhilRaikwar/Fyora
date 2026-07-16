@@ -1,4 +1,5 @@
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
+import { fileURLToPath } from "node:url";
 
 export default defineConfig({
   vite: {
@@ -7,6 +8,9 @@ export default defineConfig({
     },
     resolve: {
       alias: {
+        "@coral-xyz/anchor": fileURLToPath(
+          new URL("./node_modules/@coral-xyz/anchor/dist/cjs/index.js", import.meta.url),
+        ),
         buffer: "buffer/",
         "node:buffer": "buffer/",
         events: "events/",
