@@ -1,5 +1,4 @@
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
-import { fileURLToPath } from "node:url";
 import type { Plugin } from "vite";
 
 // Browser stand-ins for the few Node core modules the wallet SDKs pull in
@@ -38,24 +37,6 @@ export default defineConfig({
     plugins: [clientNodeShims()],
     define: {
       global: "globalThis",
-    },
-    resolve: {
-      alias: {
-        // rpc-websockets ships a node build by default; force its browser entry
-        // so the client bundle doesn't drag in ws/node:stream.
-        "rpc-websockets": fileURLToPath(
-          new URL("node_modules/rpc-websockets/dist/index.browser.mjs", import.meta.url),
-        ),
-      },
-    },
-    ssr: {
-      noExternal: [
-        "magic-sdk",
-        "@magic-ext/evm",
-        "@magic-sdk/admin",
-        "@particle-network/universal-account-sdk",
-        "rpc-websockets",
-      ],
     },
   },
   tanstackStart: {
