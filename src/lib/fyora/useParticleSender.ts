@@ -37,6 +37,71 @@ function particleError(error: unknown, context: Record<string, unknown>) {
   return error instanceof Error ? error : new Error(message);
 }
 
+async function serializeVerifiedEip7702Authorization(
+  authorization: { r: string; s: string; v: number },
+  request: { address: string; chainId: number; nonce: number },
+  ownerAddress: string,
+) {
+  const { Signature, hashAuthorization, recoverAddress } = await import("ethers");
+  const digest = hashAuthorization(request);
+  const rawVSignature = { r: authorization.r, s: authorization.s, v: authorization.v };
+  const yParitySignature = {
+    r: authorization.r,
+    s: authorization.s,
+    v: authorization.v + 27,
+  };
+
+  let recoveredWithRawV: string | null = null;
+  let recoveredWithYParity: string | null = null;
+  try {
+    recoveredWithRawV = recoverAddress(digest, rawVSignature).toLowerCase();
+  } catch {
+    recoveredWithRawV = null;
+  }
+  try {
+    recoveredWithYParity = recoverAddress(digest, yParitySignature).toLowerCase();
+  } catch {
+    recoveredWithYParity = null;
+  }
+
+  const expectedOwner = ownerAddress.toLowerCase();
+  if (sameAddress(recoveredWithRawV ?? undefined, expectedOwner)) {
+    console.error("[Fyora] EIP-7702 authorization signature verified", {
+      chainId: request.chainId,
+      nonce: request.nonce,
+      authAddress: request.address,
+      convention: "raw-v",
+      recoveredAddress: recoveredWithRawV,
+      ownerAddress: expectedOwner,
+    });
+    return Signature.from(rawVSignature).serialized;
+  }
+  if (sameAddress(recoveredWithYParity ?? undefined, expectedOwner)) {
+    console.error("[Fyora] EIP-7702 authorization signature verified", {
+      chainId: request.chainId,
+      nonce: request.nonce,
+      authAddress: request.address,
+      convention: "y-parity",
+      recoveredAddress: recoveredWithYParity,
+      ownerAddress: expectedOwner,
+    });
+    return Signature.from(yParitySignature).serialized;
+  }
+
+  console.error("[Fyora] EIP-7702 authorization signature mismatch", {
+    chainId: request.chainId,
+    nonce: request.nonce,
+    authAddress: request.address,
+    ownerAddress: expectedOwner,
+    recoveredWithRawV,
+    recoveredWithYParity,
+    magicV: authorization.v,
+  });
+  throw new Error(
+    "EIP-7702 authorization signature did not recover to the expected owner address — check Magic wallet.sign7702Authorization output format.",
+  );
+}
+
 export function useParticleSender() {
   const { identity, signRootHash, signEip7702Authorization, ensureEip7702Delegated } =
     useFyoraAuth();
@@ -82,17 +147,21 @@ export function useParticleSender() {
           const cacheKey = `${operation.eip7702Auth.chainId}:${operation.eip7702Auth.nonce}:${operation.eip7702Auth.address.toLowerCase()}`;
           let signature = authorizationCache.get(cacheKey);
           if (!signature) {
-            const authorization = await signEip7702Authorization({
+            const authorizationRequest = {
               address: operation.eip7702Auth.address,
-              chainId: operation.eip7702Auth.chainId || operation.chainId,
+              chainId: operation.eip7702Auth.chainId ?? operation.chainId,
               nonce: operation.eip7702Auth.nonce,
+            };
+            const authorization = await signEip7702Authorization({
+              address: authorizationRequest.address,
+              chainId: authorizationRequest.chainId,
+              nonce: authorizationRequest.nonce,
             });
-            const { Signature } = await import("ethers");
-            signature = Signature.from({
-              r: authorization.r,
-              s: authorization.s,
-              v: authorization.v,
-            }).serialized;
+            signature = await serializeVerifiedEip7702Authorization(
+              authorization,
+              authorizationRequest,
+              ownerAddress,
+            );
             authorizationCache.set(cacheKey, signature);
           }
           authorizations.push({
