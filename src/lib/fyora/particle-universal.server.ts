@@ -1,5 +1,5 @@
 import type { ITransaction } from "@particle-network/universal-account-sdk";
-import type { Tables } from "./database.types";
+import type { Json, Tables } from "./database.types";
 import type { UniversalAuthorization, UniversalTransaction } from "./particle-types";
 
 function env(name: string) {
@@ -29,12 +29,31 @@ export async function createUniversalAccountServer(ownerAddress: string) {
       version: UNIVERSAL_ACCOUNT_VERSION,
       ownerAddress: evmAddress(ownerAddress),
     },
-    tradeConfig: { slippageBps: 100, universalGas: true },
+    tradeConfig: { slippageBps: 100, universalGas: false },
   });
 }
 
 export async function getServerPrimaryAssets(ownerAddress: string) {
   return (await createUniversalAccountServer(ownerAddress)).getPrimaryAssets();
+}
+
+export async function getServerTransaction(
+  ownerAddress: string,
+  transactionId: string,
+): Promise<Json> {
+  const account = await createUniversalAccountServer(ownerAddress);
+  const result = await account.getTransaction(transactionId);
+  return JSON.parse(JSON.stringify(result ?? null)) as Json;
+}
+
+export async function getServerTransactions(
+  ownerAddress: string,
+  page = 1,
+  limit = 20,
+): Promise<Json> {
+  const account = await createUniversalAccountServer(ownerAddress);
+  const result = await account.getTransactions(page, limit);
+  return JSON.parse(JSON.stringify(result ?? null)) as Json;
 }
 
 export async function createPaymentTransferTransaction(

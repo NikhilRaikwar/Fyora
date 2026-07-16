@@ -1,7 +1,8 @@
 import { createClientOnlyFn } from "@tanstack/react-start";
 import { PRIMARY_ASSETS } from "./settlement";
-import type { PaymentIntent } from "./types";
-import type { UniversalAssetsResponse } from "./particle-types";
+import { mapUniversalStatusCode } from "./particle-status";
+
+export { mapUniversalStatusCode, type UniversalTxStatus } from "./particle-status";
 
 export type WalletTransferInput = {
   chainId: number;
@@ -35,11 +36,6 @@ function normalizeEvmOwnerAddress(ownerAddress: string) {
   return normalized;
 }
 
-export const loadPrimaryAssets = createClientOnlyFn(async (): Promise<UniversalAssetsResponse> => ({
-  totalAmountInUSD: 0,
-  assets: [],
-}));
-
 export const loadUniversalAccountAddresses = createClientOnlyFn(
   async (ownerAddress: string): Promise<UniversalAccountAddresses> => {
     const normalizedOwner = normalizeEvmOwnerAddress(ownerAddress);
@@ -50,18 +46,6 @@ export const loadUniversalAccountAddresses = createClientOnlyFn(
       mode: "eip7702OwnerAddress",
       lookupWarning: "Using the Magic EIP-7702 owner address as the Universal receive address.",
     };
-  },
-);
-
-export const createPaymentQuote = createClientOnlyFn(
-  async (_ownerAddress: string, _intent: PaymentIntent) => {
-    throw new Error("Particle quotes are built on the Fyora server.");
-  },
-);
-
-export const createWalletTransferQuote = createClientOnlyFn(
-  async (_ownerAddress: string, _input: WalletTransferInput) => {
-    throw new Error("Particle transfer quotes are built on the Fyora server.");
   },
 );
 
@@ -86,11 +70,15 @@ function activityValue(row: Record<string, unknown>, keys: string[]) {
 
 function normalizeActivity(row: Record<string, unknown>): WalletActivity {
   const id = String(activityValue(row, ["transactionId", "transaction_id", "id"]) ?? "");
-  const status = String(activityValue(row, ["status", "state", "transactionStatus"]) ?? "pending");
+  const rawStatus = activityValue(row, ["status", "state", "transactionStatus"]);
+  const status =
+    typeof rawStatus === "number"
+      ? mapUniversalStatusCode(rawStatus)
+      : String(rawStatus ?? "pending").toLowerCase();
   const amount = Number(activityValue(row, ["amountInUSD", "amount_in_usd", "totalAmountInUSD"]));
   return {
     id,
-    status: status.toLowerCase(),
+    status,
     createdAt:
       String(activityValue(row, ["createdAt", "created_at", "timestamp"]) ?? "") || undefined,
     receiver: String(activityValue(row, ["receiver", "to", "recipient"]) ?? "") || undefined,
@@ -99,14 +87,13 @@ function normalizeActivity(row: Record<string, unknown>): WalletActivity {
   };
 }
 
-export const loadWalletActivity = createClientOnlyFn(async (ownerAddress: string) => {
-  void ownerAddress;
-  return [];
-});
-
-export const loadWalletTransaction = createClientOnlyFn(
-  async (_ownerAddress: string, transactionId: string) => ({ transactionId, status: "pending" }),
-);
+// Shape the raw Particle `getTransactions` response (fetched on the Fyora
+// server via loadWalletActivityFn) into the WalletActivity rows the UI renders.
+export function normalizeWalletActivity(response: unknown): WalletActivity[] {
+  return activityRows(response)
+    .map(normalizeActivity)
+    .filter((row) => row.id);
+}
 
 export type OnchainTokenBalance = {
   chainId: number;

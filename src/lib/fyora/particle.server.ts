@@ -1,4 +1,5 @@
 import type { Json, Tables } from "./database.types";
+import { mapUniversalStatusCode } from "./particle-status";
 
 const UNIVERSALX_RPC_URL = "https://universal-rpc-proxy.particle.network";
 
@@ -33,37 +34,6 @@ async function getParticleTransaction(transactionId: string) {
   return payload.result;
 }
 
-const PARTICLE_STATUS = {
-  WAIT_TO_REFUND: 3,
-  EXECUTION_FAILED: 6,
-  FINISHED: 7,
-  REFUND_LOCAL: 8,
-  REFUND_PENDING: 9,
-  REFUND_FAILED: 10,
-  REFUND_FINISHED: 11,
-  PENNY_FAILED: 14,
-} as const;
-
-function statusForParticle(code: number) {
-  if (code === PARTICLE_STATUS.FINISHED) return "confirmed" as const;
-  if (code === PARTICLE_STATUS.REFUND_FINISHED) return "refunded" as const;
-  if (
-    code === PARTICLE_STATUS.WAIT_TO_REFUND ||
-    code === PARTICLE_STATUS.REFUND_LOCAL ||
-    code === PARTICLE_STATUS.REFUND_PENDING
-  ) {
-    return "refunding" as const;
-  }
-  if (
-    code === PARTICLE_STATUS.EXECUTION_FAILED ||
-    code === PARTICLE_STATUS.REFUND_FAILED ||
-    code === PARTICLE_STATUS.PENNY_FAILED
-  ) {
-    return "failed" as const;
-  }
-  return "submitted" as const;
-}
-
 function asJson(value: unknown): Json {
   return JSON.parse(JSON.stringify(value)) as Json;
 }
@@ -87,7 +57,7 @@ export async function verifyParticlePayment(payment: Tables<"payments">) {
     throw new Error("Particle transaction owner does not match the supporter.");
   }
   const statusCode = Number(transaction.status);
-  const status = statusForParticle(statusCode);
+  const status = mapUniversalStatusCode(statusCode);
   const tokenChanges = transaction.tokenChanges as Record<string, unknown> | undefined;
   const toChains = Array.isArray(tokenChanges?.toChains) ? tokenChanges?.toChains.map(Number) : [];
   if (status === "confirmed") {

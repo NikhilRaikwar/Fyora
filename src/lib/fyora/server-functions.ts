@@ -155,6 +155,28 @@ export const loadPrimaryAssetsFn = createServerFn({ method: "POST" })
     return getServerPrimaryAssets(identity.evmAddress);
   });
 
+export const loadWalletTransactionFn = createServerFn({ method: "POST" })
+  .validator(z.object({ didToken: didSchema, transactionId: z.string().trim().min(4).max(256) }))
+  .handler(async ({ data }) => {
+    const identity = await identityFor(data.didToken);
+    const { getServerTransaction } = await import("./particle-universal.server");
+    return getServerTransaction(identity.evmAddress, data.transactionId);
+  });
+
+export const loadWalletActivityFn = createServerFn({ method: "POST" })
+  .validator(
+    z.object({
+      didToken: didSchema,
+      page: z.number().int().min(1).max(100).optional(),
+      limit: z.number().int().min(1).max(100).optional(),
+    }),
+  )
+  .handler(async ({ data }) => {
+    const identity = await identityFor(data.didToken);
+    const { getServerTransactions } = await import("./particle-universal.server");
+    return getServerTransactions(identity.evmAddress, data.page ?? 1, data.limit ?? 20);
+  });
+
 export const createPaymentQuoteFn = createServerFn({ method: "POST" })
   .validator(z.object({ didToken: didSchema, intentId: z.string().uuid() }))
   .handler(async ({ data }) => {

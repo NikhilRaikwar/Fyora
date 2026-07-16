@@ -22,11 +22,16 @@ import { useFyoraAuth } from "@/lib/fyora/AuthProvider";
 import {
   loadEvmOnchainBalances,
   loadUniversalAccountAddresses,
-  loadWalletActivity,
-  loadWalletTransaction,
+  mapUniversalStatusCode,
+  normalizeWalletActivity,
   type WalletActivity,
 } from "@/lib/fyora/particle";
-import { createWalletTransferQuoteFn, loadPrimaryAssetsFn } from "@/lib/fyora/server-functions";
+import {
+  createWalletTransferQuoteFn,
+  loadPrimaryAssetsFn,
+  loadWalletActivityFn,
+  loadWalletTransactionFn,
+} from "@/lib/fyora/server-functions";
 import { useParticleSender } from "@/lib/fyora/useParticleSender";
 import { PRIMARY_ASSETS } from "@/lib/fyora/settlement";
 import type { FyoraIdentity } from "@/lib/fyora/types";
@@ -65,8 +70,13 @@ function tokenKey(value: unknown) {
 function statusFromResponse(value: unknown): string {
   if (!value || typeof value !== "object") return "pending";
   const row = value as Record<string, unknown>;
+  // Particle getTransaction() returns `status` as a numeric enum code
+  // (7 = FINISHED, 6 = EXECUTION_FAILED, ...). Map it to a string status.
+  if (typeof row.status === "number") return mapUniversalStatusCode(row.status);
   for (const key of ["status", "state", "transactionStatus", "transaction_status"]) {
-    if (row[key]) return String(row[key]).toLowerCase();
+    const raw = row[key];
+    if (typeof raw === "number") return mapUniversalStatusCode(raw);
+    if (raw) return String(raw).toLowerCase();
   }
   for (const key of ["data", "result", "transaction"]) {
     const nested = statusFromResponse(row[key]);
@@ -155,7 +165,10 @@ function AuthenticatedWalletCenter({ identity }: { identity: FyoraIdentity }) {
   });
   const activityQuery = useQuery({
     queryKey: ["particle-wallet-activity", identity?.evmAddress],
-    queryFn: () => loadWalletActivity(identity!.evmAddress),
+    queryFn: async () =>
+      normalizeWalletActivity(
+        await loadWalletActivityFn({ data: { didToken: identity!.didToken } }),
+      ),
     enabled: Boolean(identity?.evmAddress),
     retry: 1,
   });
@@ -286,7 +299,15 @@ function AuthenticatedWalletCenter({ identity }: { identity: FyoraIdentity }) {
     if (!identity) return;
     for (let attempt = 0; attempt < 45; attempt += 1) {
       await new Promise((resolve) => setTimeout(resolve, 4_000));
-      const response = await loadWalletTransaction(identity.evmAddress, id);
+      let response: unknown;
+      try {
+        response = await loadWalletTransactionFn({
+          data: { didToken: identity.didToken, transactionId: id },
+        });
+      } catch {
+        // Transient lookup failures (indexing lag / network) — keep polling.
+        continue;
+      }
       const terminal = terminalStage(statusFromResponse(response));
       if (terminal) {
         setStage(terminal);

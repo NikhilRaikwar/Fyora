@@ -18,8 +18,8 @@
 
 ## What Fyora Does
 
-1. A creator signs in with Particle email.
-2. Particle creates a user-owned EOA.
+1. A creator signs in with a Magic embedded wallet (email OTP).
+2. Magic creates a user-owned EOA and acts as the EIP-7702 signer.
 3. Particle Universal Accounts upgrades that EOA in place with **EIP-7702**.
 4. The creator claims `fyora.app/{handle}`.
 5. The creator chooses where funds should land, for example Base USDC or Arbitrum USDC.
@@ -34,12 +34,12 @@
 flowchart TD
   Supporter["👤 Supporter"]:::person
   Creator["🎨 Creator"]:::person
-  Auth["🔐 Particle Auth<br/>Email OTP"]:::particle
-  EOA["🧾 User-owned EOA"]:::wallet
+  Auth["🔐 Magic wallet<br/>Email OTP"]:::wallet
+  EOA["🧾 Magic EOA owner"]:::wallet
   UA["🌐 Particle Universal Account<br/>EIP-7702 mode"]:::particle
   Balance["💰 Universal Balance<br/>getPrimaryAssets()"]:::money
   Quote["🧭 Route + quote<br/>createTransferTransaction()"]:::route
-  Sign["✍️ Particle signing<br/>root hash confirmation"]:::wallet
+  Sign["✍️ Magic EIP-7702 signing<br/>root hash confirmation"]:::wallet
   Send["🚀 sendTransaction()"]:::particle
   UniversalX["🔎 UniversalX proof"]:::proof
   Supabase["🗄️ Supabase<br/>profiles, settlement, payments, avatars"]:::db
@@ -78,7 +78,7 @@ sequenceDiagram
   S->>F: Choose amount and confirm
   F->>P: createTransferTransaction()
   P-->>F: Route, fees, root hash
-  S->>P: Sign with Particle Auth EOA
+  S->>P: Sign with Magic EIP-7702 EOA
   F->>P: sendTransaction()
   P-->>X: Execute cross-chain operation
   X-->>F: Transaction id / proof link
@@ -88,8 +88,8 @@ sequenceDiagram
 
 ## Wallet Model
 
-- **Particle Auth EOA**: the user-owned wallet created through Particle login.
-- **EIP-7702 Universal Account**: Particle upgrades the EOA in place, so the signer and EVM receive address can be the same address.
+- **Magic EOA owner**: the user-owned wallet created through Magic email login; also the EIP-7702 signer.
+- **EIP-7702 Universal Account**: Particle upgrades the Magic EOA in place, so the signer and EVM receive address are the same address.
 - **Universal receive address**: the address shown on `/wallet`; direct deposits such as Base USDC can be sent here.
 - **Universal Balance**: loaded from Particle `getPrimaryAssets()`.
 - **Direct RPC fallback**: Fyora also checks supported EVM chains directly, so fresh deposits can appear while Particle indexing catches up.
@@ -136,17 +136,17 @@ Supabase is used as the production database, not as the auth provider.
 
 Stored data includes:
 
-- Particle UUID, verified owner email, EVM address, and optional Solana address
+- Magic owner UUID, verified owner email, EVM address, and optional Solana address
 - creator handles, bios, avatars, gradients, and socials
 - settlement chain, token, decimals, and Universal receive address
 - payment intents, status, Particle transaction id, UniversalX link, and confirmation data
 
-Server functions validate Particle sessions before protected profile or payment operations.
+Server functions validate Magic sessions (DID token) before protected profile or payment operations.
 
 ## Tech Stack
 
 - TanStack Start, React, TypeScript, Vite
-- Particle AuthKit
+- Magic embedded wallet (email OTP auth + EIP-7702 signer)
 - Particle Universal Accounts SDK
 - Supabase Postgres and Storage
 - Satori + resvg WASM for PNG cards
@@ -161,11 +161,13 @@ VITE_FYORA_PUBLIC_URL=https://www.fyora.app
 VITE_PARTICLE_PROJECT_ID=
 VITE_PARTICLE_CLIENT_KEY=
 VITE_PARTICLE_APP_ID=
+VITE_MAGIC_PUBLISHABLE_KEY=
 PARTICLE_SERVER_KEY=
 PARTICLE_RPC_URL=https://universal-rpc-proxy.particle.network
 
 SUPABASE_URL=
 SUPABASE_SECRET_KEY=
+MAGIC_SECRET_KEY=
 
 VITE_ETHEREUM_RPC_URL=
 VITE_BNB_RPC_URL=
@@ -206,7 +208,7 @@ Important migrations:
 ## Demo Steps
 
 1. Open [fyora.app](https://www.fyora.app/).
-2. Sign in with Particle email.
+2. Sign in with a Magic email OTP.
 3. Claim a creator page.
 4. Upload a profile photo and save settlement, preferably Base USDC or Arbitrum USDC.
 5. Open `/wallet`.
@@ -215,7 +217,7 @@ Important migrations:
 8. Refresh `/wallet` and show Universal Balance/direct deposit detection.
 9. Open another creator page.
 10. Send a tiny support payment, such as `$0.01`.
-11. Confirm with Particle.
+11. Confirm with the Magic EIP-7702 signer.
 12. Open the UniversalX link as proof of the Universal Account operation.
 
 ## Particle Docs
@@ -224,4 +226,3 @@ Important migrations:
 - [Universal Accounts Overview](https://developers.particle.network/universal-accounts/cha/overview)
 - [Universal Accounts Web Quickstart](https://developers.particle.network/universal-accounts/cha/web-quickstart)
 - [Universal Accounts Transfer Reference](https://developers.particle.network/universal-accounts/ua-reference/web/transactions/transfer)
-- [Particle Auth Web SDK](https://developers.particle.network/social-logins/auth/desktop-sdks/web)
