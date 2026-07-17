@@ -1,6 +1,15 @@
 declare module "@particle-network/universal-account-sdk" {
   export type EIP7702Authorization = { userOpHash: string; signature: string };
 
+  export enum SUPPORTED_TOKEN_TYPE {
+    ETH = "eth",
+    USDT = "usdt",
+    USDC = "usdc",
+    BTC = "btc",
+    BNB = "bnb",
+    SOL = "sol",
+  }
+
   export type ISmartAccountOptions = {
     name?: string;
     version?: string;
@@ -67,6 +76,11 @@ declare module "@particle-network/universal-account-sdk" {
       token: { chainId: number; address: string };
       amount: string;
       receiver: string;
+    }): Promise<ITransaction>;
+    createUniversalTransaction(input: {
+      chainId: number;
+      expectTokens: Array<{ type: SUPPORTED_TOKEN_TYPE; amount: string }>;
+      transactions: Array<{ to: string; data: string; value?: string }>;
     }): Promise<ITransaction>;
     getEIP7702Deployments(): Promise<unknown>;
     getEIP7702Auth(

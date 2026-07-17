@@ -259,12 +259,12 @@ function Public() {
           <span className="text-xs text-muted-foreground">💌</span>
         </div>
         <div className="space-y-3">
-          {creator.payments.length === 0 && (
+          {confirmedPayments.length === 0 && (
             <div className="rounded-2xl bg-card chunky shadow-sticker-sm p-6 text-center text-muted-foreground">
               Be the first to send some love ✨
             </div>
           )}
-          {creator.payments.map((p) => (
+          {confirmedPayments.map((p) => (
             <motion.div
               key={p.id}
               initial={{ opacity: 0, y: 8 }}

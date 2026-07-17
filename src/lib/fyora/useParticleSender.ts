@@ -11,6 +11,8 @@ type TransferInput = {
   tokenAddress: string;
   amount: string;
   receiver: string;
+  tokenType?: string;
+  tokenDecimals?: number;
 };
 
 function sameAddress(left?: string, right?: string) {
@@ -123,9 +125,6 @@ export function useParticleSender() {
         throw new Error("Magic wallet is not ready yet.");
       }
       await ensureEip7702Delegated(identity.evmAddress);
-      if (input.chainId > 0 && input.chainId !== 8453) {
-        await ensureEip7702Delegated(identity.evmAddress, input.chainId);
-      }
       return createBrowserTransferTransaction(identity.evmAddress, input);
     },
     [ensureEip7702Delegated, identity?.evmAddress],

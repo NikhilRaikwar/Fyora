@@ -17,7 +17,9 @@
 
 - Live app: [fyora.app](https://www.fyora.app/)
 - Example creator: [fyora.app/nikhil](https://www.fyora.app/nikhil)
-- Demo proof: [UniversalX transaction 0x0656c14584b419](https://universalx.app/activity/details?id=0x0656c14584b419)
+- Demo video: [YouTube walkthrough](https://youtu.be/yRjyrXbJt80)
+- Pitch deck: [Google Slides](https://docs.google.com/presentation/d/1sPfB3Z58jU2jQU-7NhNdqHi3H7p3fqV-NbrBlehc3v8/edit?usp=sharing)
+- Cross-chain proof: [UniversalX transaction 0x0656d36c12e739](https://universalx.app/activity/details?id=0x0656d36c12e739)
 
 ## Problem
 
@@ -133,22 +135,26 @@ Fyora keeps the wallet model simple for users:
 - **Particle Universal Account**: turns the EOA into a chain-abstracted account without creating a new visible wallet address.
 - **Universal receive address**: the wallet address shown on `/wallet`; users can deposit assets like Base USDC here.
 - **Universal Balance**: loaded from Particle `getPrimaryAssets()`.
-- **Payments and sends**: built with Particle `createTransferTransaction()` and executed with `sendTransaction()`.
+- **Payments and sends**: built with Particle transfer quotes, with a `createUniversalTransaction()` stablecoin fallback for small cross-chain creator payouts, then executed with `sendTransaction()`.
 
 ## Real Demo Proof
 
-The working demo transaction is [UniversalX transaction `0x0656c14584b419`](https://universalx.app/activity/details?id=0x0656c14584b419).
+The working cross-chain demo transaction is [UniversalX transaction `0x0656d36c12e739`](https://universalx.app/activity/details?id=0x0656d36c12e739).
 
 It shows:
 
 - status: `Success`
 - asset: `USDC`
-- transaction id: `0x0656c14584b419`
+- route: Base USDC -> Arbitrum One USDC
+- transaction id: `0x0656d36c12e739`
 - from wallet: `0xea...ee3d`
 - to wallet: `0xA6...CD9c`
-- UniversalX activity with Base and Arbitrum route evidence
+- source chain: Base
+- target chain: Arbitrum One
+- source tx: [BaseScan `0xd769f645d3fc253100176261279ba06cabc0fdfb77fcafbe280f5660aa09af07`](https://basescan.org/tx/0xd769f645d3fc253100176261279ba06cabc0fdfb77fcafbe280f5660aa09af07)
+- target tx: [Arbiscan `0xa4a8ff6d21aee32a1360b9dc26731a97a14b0b97a8593153cc8a43216e072391`](https://arbiscan.io/tx/0xa4a8ff6d21aee32a1360b9dc26731a97a14b0b97a8593153cc8a43216e072391)
 
-That proof is the main demo artifact for the Universal Accounts Track.
+That proof is the main demo artifact for the Universal Accounts Track because it demonstrates real value moving from Base to Arbitrum through Particle Universal Accounts.
 
 ## Creator Profiles
 
@@ -245,7 +251,9 @@ git diff --check
 
 - [Fyora live app](https://www.fyora.app/)
 - [Example Fyora creator page](https://www.fyora.app/nikhil)
-- [UniversalX demo proof](https://universalx.app/activity/details?id=0x0656c14584b419)
+- [Demo video](https://youtu.be/yRjyrXbJt80)
+- [Pitch deck](https://docs.google.com/presentation/d/1sPfB3Z58jU2jQU-7NhNdqHi3H7p3fqV-NbrBlehc3v8/edit?usp=sharing)
+- [UniversalX cross-chain demo proof](https://universalx.app/activity/details?id=0x0656d36c12e739)
 - [Particle Developer Docs](https://developers.particle.network/)
 - [Particle Universal Accounts Overview](https://developers.particle.network/universal-accounts/cha/overview)
 - [Particle Universal Accounts Web Quickstart](https://developers.particle.network/universal-accounts/cha/web-quickstart)

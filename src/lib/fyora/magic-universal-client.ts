@@ -7,6 +7,11 @@ type UniversalAccountClient = {
     amount: string;
     receiver: string;
   }) => Promise<UniversalTransaction>;
+  createUniversalTransaction: (input: {
+    chainId: number;
+    expectTokens: Array<{ type: unknown; amount: string }>;
+    transactions: Array<{ to: string; data: string; value?: string }>;
+  }) => Promise<UniversalTransaction>;
   sendTransaction: (
     transaction: UniversalTransaction,
     signature: string,
@@ -19,6 +24,8 @@ type TransferInput = {
   tokenAddress: string;
   amount: string;
   receiver: string;
+  tokenType?: string;
+  tokenDecimals?: number;
 };
 
 const accountCache = new Map<string, Promise<UniversalAccountClient>>();
@@ -44,7 +51,7 @@ export async function getBrowserUniversalAccount(ownerAddress: string) {
 
   const accountPromise = (async () => {
     installBrowserPolyfills();
-    const { UniversalAccount, UNIVERSAL_ACCOUNT_VERSION } =
+    const { SUPPORTED_TOKEN_TYPE, UniversalAccount, UNIVERSAL_ACCOUNT_VERSION } =
       await import("@particle-network/universal-account-sdk");
     return new UniversalAccount({
       projectId: env("VITE_PARTICLE_PROJECT_ID"),
@@ -59,6 +66,7 @@ export async function getBrowserUniversalAccount(ownerAddress: string) {
       tradeConfig: {
         slippageBps: 100,
         universalGas: false,
+        usePrimaryTokens: [SUPPORTED_TOKEN_TYPE.USDC],
       },
     }) as UniversalAccountClient;
   })();
@@ -69,14 +77,52 @@ export async function getBrowserUniversalAccount(ownerAddress: string) {
 
 export async function createBrowserTransferTransaction(ownerAddress: string, input: TransferInput) {
   const account = await getBrowserUniversalAccount(ownerAddress);
-  return account.createTransferTransaction({
-    token: {
+  try {
+    return await account.createTransferTransaction({
+      token: {
+        chainId: input.chainId,
+        address: input.tokenAddress,
+      },
+      amount: input.amount,
+      receiver: input.receiver,
+    });
+  } catch (error) {
+    if (!/insufficient primary token balance/i.test(error instanceof Error ? error.message : "")) {
+      throw error;
+    }
+
+    const tokenType = input.tokenType?.toLowerCase();
+    if (tokenType !== "usdc" && tokenType !== "usdt") throw error;
+
+    const { Interface, parseUnits } = await import("ethers");
+    const { SUPPORTED_TOKEN_TYPE } = await import("@particle-network/universal-account-sdk");
+    const supportedTokenType =
+      tokenType === "usdc" ? SUPPORTED_TOKEN_TYPE.USDC : SUPPORTED_TOKEN_TYPE.USDT;
+    const decimals = input.tokenDecimals ?? 6;
+    const erc20 = new Interface(["function transfer(address to,uint256 value)"]);
+
+    console.error("[Fyora] Falling back to Particle universal payout transaction", {
       chainId: input.chainId,
-      address: input.tokenAddress,
-    },
-    amount: input.amount,
-    receiver: input.receiver,
-  });
+      tokenType,
+      tokenAddress: input.tokenAddress,
+      amount: input.amount,
+      receiver: input.receiver,
+    });
+
+    return account.createUniversalTransaction({
+      chainId: input.chainId,
+      expectTokens: [{ type: supportedTokenType, amount: input.amount }],
+      transactions: [
+        {
+          to: input.tokenAddress,
+          data: erc20.encodeFunctionData("transfer", [
+            input.receiver,
+            parseUnits(input.amount, decimals),
+          ]),
+        },
+      ],
+    });
+  }
 }
 
 export async function sendBrowserUniversalTransaction(

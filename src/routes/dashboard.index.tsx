@@ -119,6 +119,7 @@ function Dashboard() {
     );
   }
 
+  const confirmedPayments = creator.payments.filter((payment) => payment.status === "confirmed");
   const shareUrl = `https://www.fyora.app/${creator.handle}`;
   const cardUrl = `https://www.fyora.app/api/public/og/${encodeURIComponent(
     creator.handle,
@@ -454,13 +455,13 @@ function Dashboard() {
               Refresh
             </button>
           </div>
-          {creator.payments.length === 0 ? (
+          {confirmedPayments.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
-              No payments yet. Share your link!
+              No confirmed payments yet. Share your link!
             </div>
           ) : (
             <div className="divide-y-2 divide-dashed divide-ink/15">
-              {creator.payments.map((p) => (
+              {confirmedPayments.map((p) => (
                 <div key={p.id} className="py-3 flex items-center gap-3 flex-wrap">
                   <div className="w-9 h-9 rounded-full bg-secondary chunky flex items-center justify-center text-lg">
                     {p.supporterEmoji}

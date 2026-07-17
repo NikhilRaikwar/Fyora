@@ -1,6 +1,7 @@
 import type { Tables, TablesUpdate } from "./database.types";
 import { getSupabaseServerClient } from "./supabase.server";
 import { resolveSettlementAsset } from "./settlement";
+import { CHAINS } from "./chains";
 import type {
   Creator,
   FyoraIdentity,
@@ -43,13 +44,59 @@ function asSocials(value: unknown): Social[] {
   });
 }
 
+function sourceToken(source: Record<string, unknown>) {
+  return source.token && typeof source.token === "object"
+    ? (source.token as Record<string, unknown>)
+    : source;
+}
+
+function sourceTokenSymbol(source: Record<string, unknown>) {
+  const token = sourceToken(source);
+  return String(
+    token.tokenId ?? token.symbol ?? token.type ?? source.tokenId ?? source.symbol ?? "unknown",
+  ).toLowerCase();
+}
+
+function sourceChainSlug(source: Record<string, unknown>) {
+  const token = sourceToken(source);
+  const raw =
+    token.chainSlug ??
+    token.chain ??
+    token.network ??
+    token.chainId ??
+    source.chainSlug ??
+    source.chain ??
+    source.chainId;
+  const chain = CHAINS.find((entry) => String(entry.chainId) === String(raw) || entry.id === raw);
+  return chain?.id ?? String(raw ?? "unknown").toLowerCase();
+}
+
+function sourceUsd(source: Record<string, unknown>) {
+  return Number(source.amountInUSD ?? source.amountUsd ?? source.usdValue ?? source.valueUsd ?? 0);
+}
+
+function sourceEntry(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
 function paymentSource(payment: PaymentRow) {
-  const first = Array.isArray(payment.source_evidence) ? payment.source_evidence[0] : undefined;
-  if (!first || typeof first !== "object") return { chain: "unknown", token: "unknown" };
-  const source = first as Record<string, unknown>;
+  const entries = Array.isArray(payment.source_evidence)
+    ? payment.source_evidence.flatMap((entry) => {
+        const source = sourceEntry(entry);
+        return source ? [source] : [];
+      })
+    : [];
+  const destinationToken = payment.destination_token_symbol.toLowerCase();
+  const source =
+    entries.find((entry) => sourceTokenSymbol(entry) === destinationToken) ??
+    entries.find((entry) => sourceUsd(entry) >= Number(payment.amount_usd) * 0.5) ??
+    entries[0];
+  if (!source) return { chain: "unknown", token: "unknown" };
   return {
-    chain: String(source.chainSlug ?? source.chain ?? source.chainId ?? "unknown"),
-    token: String(source.tokenId ?? source.symbol ?? "unknown").toLowerCase(),
+    chain: sourceChainSlug(source),
+    token: sourceTokenSymbol(source),
   };
 }
 

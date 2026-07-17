@@ -205,6 +205,8 @@ export function PaymentSheet({
       const { result: submitted } = await sendTransfer({
         chainId: intent.destination.chainId,
         tokenAddress: intent.destination.tokenAddress,
+        tokenType: intent.destination.token,
+        tokenDecimals: intent.destination.tokenDecimals,
         amount: String(intent.amountUsd),
         receiver: intent.destination.address,
       });
