@@ -4,7 +4,6 @@ import {
   Outlet,
   Link,
   createRootRouteWithContext,
-  useRouter,
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
@@ -34,7 +33,6 @@ function NotFoundComponent() {
 
 function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   console.error(error);
-  const router = useRouter();
 
   return (
     <div className="min-h-screen bg-paper text-ink flex items-center justify-center px-4">
@@ -47,8 +45,8 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
         <div className="mt-6 flex flex-wrap justify-center gap-3">
           <button
             onClick={() => {
-              router.invalidate();
               reset();
+              window.location.reload();
             }}
             className="rounded-full bg-ink text-paper chunky shadow-sticker px-5 py-2.5 font-semibold press"
           >

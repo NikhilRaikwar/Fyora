@@ -75,7 +75,12 @@ function Explore() {
                 style={{ transform: `rotate(${i % 3 === 0 ? 0.6 : i % 3 === 1 ? -0.4 : 0.2}deg)` }}
               >
                 <div className="flex items-start justify-between">
-                  <EmojiAvatar emoji={c.emoji} gradient={c.gradient} size={64} />
+                  <EmojiAvatar
+                    emoji={c.emoji}
+                    gradient={c.gradient}
+                    avatarUrl={c.avatarUrl}
+                    size={64}
+                  />
                   <ChainBadge id={c.settlement.chain} />
                 </div>
                 <div className="mt-4 font-display text-3xl italic leading-tight">{c.name}</div>

@@ -289,6 +289,7 @@ export async function updateCreator(input: {
   name: string;
   bio: string;
   emoji: string;
+  socials: Social[];
   chainId: number;
   tokenAddress: string;
   universalAddresses: UniversalSettlementAddresses;
@@ -300,7 +301,13 @@ export async function updateCreator(input: {
   const supabase = getSupabaseServerClient();
   const { error: profileError } = await supabase
     .from("profiles")
-    .update({ display_name: input.name, bio: input.bio, avatar_emoji: input.emoji })
+    .update({
+      display_name: input.name,
+      bio: input.bio,
+      avatar_emoji: input.emoji,
+      socials: input.socials,
+      updated_at: new Date().toISOString(),
+    })
     .eq("id", current.profileId)
     .eq("owner_particle_uuid", input.identity.issuer);
   if (profileError) throw profileError;
@@ -344,10 +351,7 @@ export async function refreshCreatorShareCard(identity: FyoraIdentity) {
 async function supporterDisplayNameForIdentity(identity: FyoraIdentity) {
   const supabase = getSupabaseServerClient();
   const ownerEmail = normalizedEmail(identity.email);
-  const baseQuery = supabase
-    .from("profiles")
-    .select("display_name, handle")
-    .limit(1);
+  const baseQuery = supabase.from("profiles").select("display_name, handle").limit(1);
 
   const { data: evmProfiles, error: evmError } = await baseQuery.eq(
     "owner_evm_address",

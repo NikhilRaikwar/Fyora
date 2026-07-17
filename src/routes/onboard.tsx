@@ -71,12 +71,13 @@ function Onboard() {
   const { identity, loading, isLoading, creator, refreshIdentity } = useCurrentCreator();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const [completed, setCompleted] = useState(false);
 
   useEffect(() => {
-    if (identity && creator) {
+    if (identity && creator && !completed) {
       navigate({ to: "/dashboard", replace: true });
     }
-  }, [identity, creator, navigate]);
+  }, [identity, creator, completed, navigate]);
 
   const [step, setStep] = useState(0);
   const [handle, setHandle] = useState(h ?? "");
@@ -111,7 +112,7 @@ function Onboard() {
   const address =
     selectedAsset.networkType === "solana"
       ? (addressesQuery.data?.solanaUaAddress ?? "")
-      : (addressesQuery.data?.evmUaAddress ?? "");
+      : (addressesQuery.data?.evmUaAddress ?? identity?.evmAddress ?? "");
   const available = cleanHandle.length >= 3 && !checkingHandle && existingHandle === null;
 
   const canNext = useMemo(() => {
@@ -146,8 +147,9 @@ function Onboard() {
           universalAddresses: addressesQuery.data,
         },
       });
-      await queryClient.invalidateQueries();
+      setCompleted(true);
       setStep(3);
+      await queryClient.invalidateQueries();
       setTimeout(() => {
         confetti({
           particleCount: 160,
@@ -161,6 +163,46 @@ function Onboard() {
     } finally {
       setPublishing(false);
     }
+  };
+
+  const explainBlockedStep = () => {
+    if (step === 0) {
+      if (cleanHandle.length < 3) {
+        toast.error("Choose a handle with at least 3 characters.");
+        return;
+      }
+      if (checkingHandle) {
+        toast.message("Checking handle availability...");
+        return;
+      }
+      if (existingHandle) {
+        toast.error("That handle is already taken.");
+        return;
+      }
+    }
+    if (step === 1) {
+      toast.error("Add your display name to continue.");
+      return;
+    }
+    if (step === 2) {
+      toast.error("Universal receive address is still loading. Try Refresh or switch to EVM.");
+    }
+  };
+
+  const goBack = () => {
+    if (step > 0) {
+      setStep(step - 1);
+      return;
+    }
+    navigate({ to: "/", replace: true });
+  };
+
+  const goNext = () => {
+    if (!canNext) {
+      explainBlockedStep();
+      return;
+    }
+    setStep(step + 1);
   };
 
   if (loading || (identity && isLoading))
@@ -509,24 +551,31 @@ function Onboard() {
           {step < 3 && (
             <div className="mt-8 flex items-center justify-between">
               <button
-                onClick={() => setStep(Math.max(0, step - 1))}
-                disabled={step === 0}
+                type="button"
+                onClick={goBack}
                 className="inline-flex items-center gap-1 rounded-full bg-card chunky shadow-sticker-sm px-4 py-2 font-semibold press disabled:opacity-40"
               >
                 <ArrowLeft className="w-4 h-4" /> Back
               </button>
               {step < 2 ? (
                 <button
-                  onClick={() => setStep(step + 1)}
-                  disabled={!canNext}
+                  type="button"
+                  onClick={goNext}
                   className="inline-flex items-center gap-1 rounded-full bg-ink text-paper chunky shadow-sticker px-5 py-2.5 font-semibold press disabled:opacity-40"
                 >
                   Continue <ArrowRight className="w-4 h-4" />
                 </button>
               ) : (
                 <button
-                  onClick={done}
-                  disabled={!canNext || publishing}
+                  type="button"
+                  onClick={() => {
+                    if (!canNext) {
+                      explainBlockedStep();
+                      return;
+                    }
+                    void done();
+                  }}
+                  disabled={publishing}
                   className="inline-flex items-center gap-1 rounded-full bg-lime text-ink chunky shadow-sticker px-5 py-2.5 font-semibold press disabled:opacity-40"
                 >
                   Publish page ✨

@@ -27,6 +27,16 @@ function particleError(error: unknown, context: Record<string, unknown>) {
   const code = record.code;
   const data = record.data;
   console.error("[Fyora] Particle send failed", { message, code, data, ...context });
+  if (/insufficient primary token balance/i.test(message)) {
+    return new Error(
+      "Particle could not quote this cross-chain route with the current primary balance. Add more Base USDC/ETH as routing buffer, refresh Universal Balance, or try a smaller/Base-settled payment for the demo.",
+    );
+  }
+  if (/transaction would fail on the target chain/i.test(message)) {
+    return new Error(
+      "Particle rejected this route on the target chain. Refresh the quote and confirm the creator settlement token/address match the destination chain.",
+    );
+  }
   if (data || code) {
     return new Error(
       `${message}${code ? ` (code ${String(code)})` : ""}${

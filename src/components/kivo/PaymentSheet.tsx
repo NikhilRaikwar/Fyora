@@ -66,6 +66,16 @@ export function PaymentSheet({
     ],
     [chain.name, token.symbol],
   );
+  const routeSource = useMemo(
+    () =>
+      balances.find(
+        (balance) => balance.token === creator.settlement.token && balance.amountInUSD > 0,
+      ) ??
+      balances.find((balance) => balance.token === "usdc" && balance.amountInUSD > 0) ??
+      balances[0],
+    [balances, creator.settlement.token],
+  );
+  const crossChainRoute = Boolean(routeSource && routeSource.chain !== creator.settlement.chain);
 
   useEffect(() => {
     if (open) {
@@ -373,12 +383,18 @@ export function PaymentSheet({
                   </div>
                   <div className="rounded-2xl chunky bg-secondary p-3 flex items-center gap-2 text-sm">
                     <span className="font-semibold">Route:</span>
-                    <TokenBadge id={balances[0]?.token ?? "usdc"} size="sm" />
-                    <ChainBadge id={balances[0]?.chain ?? "base"} size="sm" />
+                    <TokenBadge id={routeSource?.token ?? "usdc"} size="sm" />
+                    <ChainBadge id={routeSource?.chain ?? "base"} size="sm" />
                     <ArrowRight className="w-3 h-3" />
                     <TokenBadge id={creator.settlement.token} size="sm" />
                     <ChainBadge id={creator.settlement.chain} size="sm" />
                   </div>
+                  {crossChainRoute && (
+                    <p className="text-xs text-muted-foreground">
+                      Cross-chain routes need extra Particle routing buffer. If quote fails, add
+                      more Base USDC/ETH or test a smaller amount.
+                    </p>
+                  )}
                   <button
                     onClick={handleSend}
                     disabled={unifiedTotal < amount || !idempotencyKey}

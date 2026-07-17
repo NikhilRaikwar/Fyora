@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   ExternalLink,
   Loader2,
+  PiggyBank,
   QrCode,
   RefreshCw,
   Send,
@@ -140,7 +141,7 @@ function WalletCenter() {
 
 function AuthenticatedWalletCenter({ identity }: { identity: FyoraIdentity }) {
   const { createTransferQuote, sendPaymentQuote } = useParticleSender();
-  const { ensureEip7702Delegated } = useFyoraAuth();
+  const { ensureEip7702Delegated, openWallet } = useFyoraAuth();
   const [receiveNetwork, setReceiveNetwork] = useState<"evm" | "solana">("evm");
   const [tokenId, setTokenId] = useState<(typeof TOKEN_IDS)[number]>("usdc");
   const [chainId, setChainId] = useState(8453);
@@ -365,6 +366,13 @@ function AuthenticatedWalletCenter({ identity }: { identity: FyoraIdentity }) {
   const universalXUrl = transactionId
     ? `https://universalx.app/activity/details?id=${encodeURIComponent(transactionId)}`
     : "";
+  const handleOpenMagicWallet = async () => {
+    try {
+      await openWallet();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Magic wallet could not open.");
+    }
+  };
 
   return (
     <div className="min-h-screen bg-paper text-ink">
@@ -513,6 +521,27 @@ function AuthenticatedWalletCenter({ identity }: { identity: FyoraIdentity }) {
                 </div>
               </div>
             )}
+            <div className="mt-4 rounded-2xl bg-paper p-4 chunky">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-[10px] font-bold uppercase text-muted-foreground">
+                    Wallet tools
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Open Magic to view or fund the embedded EOA. Fyora sends still route through
+                    Particle Universal Accounts.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleOpenMagicWallet}
+                  className="inline-flex shrink-0 items-center gap-2 rounded-full bg-card px-3 py-2 text-xs font-semibold chunky shadow-sticker-sm press"
+                >
+                  <PiggyBank className="h-4 w-4" />
+                  Open Magic
+                </button>
+              </div>
+            </div>
           </div>
         </section>
 

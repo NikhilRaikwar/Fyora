@@ -10,7 +10,7 @@ import { PaymentSheet } from "@/components/kivo/PaymentSheet";
 import { getPublicCreatorFn } from "@/lib/fyora/server-functions";
 import { useState } from "react";
 import { motion } from "motion/react";
-import { Github, Globe, Youtube, Instagram, ArrowRight, Heart } from "lucide-react";
+import { Github, Globe, Youtube, Instagram, ArrowRight, Heart, ExternalLink } from "lucide-react";
 import { HandleUrl } from "@/components/kivo/Logo";
 
 export const Route = createFileRoute("/$handle")({
@@ -280,6 +280,17 @@ function Public() {
                   <span className="text-muted-foreground text-xs">·</span>
                   <span className="text-xs text-muted-foreground">{fmtAgo(p.createdAt)}</span>
                   <span className="ml-auto font-display italic text-2xl">${p.amountUsd}</span>
+                  {p.universalxUrl && (
+                    <button
+                      type="button"
+                      onClick={() => window.open(p.universalxUrl, "_blank", "noopener,noreferrer")}
+                      className="w-8 h-8 rounded-full bg-card chunky shadow-sticker-sm flex items-center justify-center press"
+                      title="View UniversalX proof"
+                      aria-label={`View UniversalX proof for ${p.supporterName}`}
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                 </div>
                 {p.note && <div className="text-sm mt-1 italic">"{p.note}"</div>}
                 <div className="mt-2 flex items-center gap-1">

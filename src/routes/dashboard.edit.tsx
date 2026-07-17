@@ -10,9 +10,10 @@ import { updateCreatorAvatarFn, updateCreatorFn } from "@/lib/fyora/server-funct
 import { loadUniversalAccountAddresses } from "@/lib/fyora/particle";
 import { SETTLEMENT_CHAINS, settlementAssetsForChain } from "@/lib/fyora/settlement";
 import { useEffect, useState } from "react";
-import { Save, ArrowLeft, Upload } from "lucide-react";
+import { Save, ArrowLeft, Upload, Plus, X } from "lucide-react";
 import { toast } from "sonner";
 import { HandleUrl } from "@/components/kivo/Logo";
+import type { Social } from "@/lib/fyora/types";
 
 export const Route = createFileRoute("/dashboard/edit")({
   head: () => ({
@@ -33,6 +34,7 @@ function EditPage() {
   const [name, setName] = useState("");
   const [bio, setBio] = useState("");
   const [emoji, setEmoji] = useState("🦊");
+  const [socials, setSocials] = useState<Social[]>([]);
   const [chain, setChain] = useState("arbitrum");
   const [token, setToken] = useState("usdc");
   const [saving, setSaving] = useState(false);
@@ -54,6 +56,7 @@ function EditPage() {
       setName(creator.name);
       setBio(creator.bio);
       setEmoji(creator.emoji);
+      setSocials(creator.socials.length ? creator.socials : [{ kind: "site", url: "" }]);
       setChain(creator.settlement.chain);
       setToken(creator.settlement.token);
       setAvatarPreview(creator.avatarUrl);
@@ -145,6 +148,12 @@ function EditPage() {
           name,
           bio,
           emoji,
+          socials: socials
+            .filter((social) => social.url.trim())
+            .map((social) => ({
+              ...social,
+              url: /^https?:\/\//i.test(social.url) ? social.url : `https://${social.url}`,
+            })),
           chainId: selectedAsset.chainId,
           tokenAddress: selectedAsset.tokenAddress,
           universalAddresses: addressesQuery.data,
@@ -282,6 +291,62 @@ function EditPage() {
                     {e}
                   </button>
                 ))}
+              </div>
+            </div>
+            <div>
+              <div className="text-xs uppercase font-bold tracking-wider text-muted-foreground mb-2">
+                Social links
+              </div>
+              <div className="space-y-2">
+                {socials.map((social, index) => (
+                  <div key={index} className="flex items-center gap-2">
+                    <select
+                      value={social.kind}
+                      onChange={(event) => {
+                        const next = [...socials];
+                        next[index] = {
+                          ...social,
+                          kind: event.target.value as Social["kind"],
+                        };
+                        setSocials(next);
+                      }}
+                      className="bg-secondary chunky rounded-xl px-3 py-2 outline-none font-semibold"
+                    >
+                      <option value="x">X</option>
+                      <option value="github">GitHub</option>
+                      <option value="site">Website</option>
+                      <option value="youtube">YouTube</option>
+                      <option value="ig">Instagram</option>
+                    </select>
+                    <input
+                      value={social.url}
+                      onChange={(event) => {
+                        const next = [...socials];
+                        next[index] = { ...social, url: event.target.value };
+                        setSocials(next);
+                      }}
+                      placeholder="https://..."
+                      className="flex-1 bg-secondary chunky rounded-xl px-3 py-2 outline-none min-w-0"
+                    />
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setSocials(socials.filter((_, itemIndex) => itemIndex !== index))
+                      }
+                      className="w-9 h-9 rounded-xl bg-card chunky shadow-sticker-sm flex items-center justify-center press"
+                      aria-label="Remove social link"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => setSocials([...socials, { kind: "site", url: "" }])}
+                  className="inline-flex items-center gap-1 rounded-full bg-card chunky shadow-sticker-sm px-3 py-1.5 text-sm font-semibold press"
+                >
+                  <Plus className="w-4 h-4" /> Add link
+                </button>
               </div>
             </div>
             <div>

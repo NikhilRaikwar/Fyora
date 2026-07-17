@@ -84,6 +84,7 @@ export const updateCreatorFn = createServerFn({ method: "POST" })
         name: z.string().trim().min(1).max(60),
         bio: z.string().trim().max(240),
         emoji: z.string().trim().min(1).max(16),
+        socials: z.array(socialSchema).max(8),
         universalAddresses: universalAddressesSchema,
       })
       .and(chainSchema),

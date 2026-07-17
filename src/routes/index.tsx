@@ -5,10 +5,11 @@ import { Sticker } from "@/components/kivo/Sticker";
 import { FloatingCoins } from "@/components/kivo/FloatingCoins";
 import { EmojiAvatar } from "@/components/kivo/EmojiAvatar";
 import { motion } from "motion/react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { listPublicCreatorsFn } from "@/lib/fyora/server-functions";
 import { ChainBadge } from "@/components/kivo/Badges";
 import { ArrowRight, Zap, Globe2, Sparkles } from "lucide-react";
+import { useCurrentCreator } from "@/lib/fyora/hooks";
 
 export const Route = createFileRoute("/")({
   loader: async () => {
@@ -37,10 +38,16 @@ function Landing() {
   const creators = Route.useLoaderData();
   const [handle, setHandle] = useState("");
   const navigate = useNavigate();
+  const { identity, creator, loading, isLoading } = useCurrentCreator();
   const clean = handle
     .trim()
     .toLowerCase()
     .replace(/[^a-z0-9_]/g, "");
+
+  useEffect(() => {
+    if (loading || isLoading || !identity) return;
+    navigate({ to: creator ? "/dashboard" : "/onboard", replace: true });
+  }, [creator, identity, isLoading, loading, navigate]);
 
   return (
     <div className="min-h-screen bg-paper text-ink">
@@ -131,7 +138,12 @@ function Landing() {
                   className="group flex items-center gap-2 rounded-full bg-card chunky shadow-sticker-sm pl-1 pr-4 py-1 press"
                   style={{ transform: `rotate(${(i % 2 ? -1 : 1) * (1 + (i % 3))}deg)` }}
                 >
-                  <EmojiAvatar emoji={c.emoji} gradient={c.gradient} size={32} />
+                  <EmojiAvatar
+                    emoji={c.emoji}
+                    gradient={c.gradient}
+                    avatarUrl={c.avatarUrl}
+                    size={32}
+                  />
                   <span className="font-semibold">@{c.handle}</span>
                 </Link>
               ))}
@@ -223,7 +235,12 @@ function Landing() {
                 params={{ handle: c.handle }}
                 className="rounded-3xl bg-paper text-ink p-4 chunky-thick shadow-sticker-lg press"
               >
-                <EmojiAvatar emoji={c.emoji} gradient={c.gradient} size={56} />
+                <EmojiAvatar
+                  emoji={c.emoji}
+                  gradient={c.gradient}
+                  avatarUrl={c.avatarUrl}
+                  size={56}
+                />
                 <div className="mt-3 font-display italic text-2xl leading-tight">{c.name}</div>
                 <div className="text-xs text-muted-foreground">@{c.handle}</div>
                 <p className="text-sm mt-2 line-clamp-2">{c.bio}</p>
