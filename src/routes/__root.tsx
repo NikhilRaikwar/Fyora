@@ -67,7 +67,7 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   head: () => {
     const baseUrl = "https://www.fyora.app";
-    const ogImage = `${baseUrl}/api/public/og/fyora.png?v=1`;
+    const ogImage = `${baseUrl}/fyora-cover.jpg?v=1`;
     return {
       meta: [
         { charSet: "utf-8" },
